@@ -1,0 +1,92 @@
+[
+  {
+    "rank": 1,
+    "name": "South Bank Parklands",
+    "locality": "South Brisbane, QLD",
+    "lat": -27.4763,
+    "lon": 153.0198,
+    "category": "urban_park",
+    "description": "Iconic riverside parklands in central Brisbane with Streets Beach, gardens and markets."
+  },
+  {
+    "rank": 2,
+    "name": "Lamington National Park",
+    "locality": "Canungra, QLD",
+    "lat": -28.2333,
+    "lon": 153.1333,
+    "category": "national_park",
+    "description": "UNESCO World Heritage rainforest park famed for the Border Track and O'Reilly's treetop walk."
+  },
+  {
+    "rank": 3,
+    "name": "Springbrook National Park",
+    "locality": "Springbrook, QLD",
+    "lat": -28.2167,
+    "lon": 153.2667,
+    "category": "national_park",
+    "description": "Gondwana rainforest park with Purling Brook Falls and the Natural Bridge glow-worm cave."
+  },
+  {
+    "rank": 4,
+    "name": "Mount Coot-tha Forest",
+    "locality": "Mount Coot-tha, QLD",
+    "lat": -27.4761,
+    "lon": 152.9508,
+    "category": "regional_park",
+    "description": "Brisbane's largest bushland reserve with lookouts, the Botanic Gardens and mountain-bike trails."
+  },
+  {
+    "rank": 5,
+    "name": "Broadwater Parklands",
+    "locality": "Southport, QLD",
+    "lat": -27.9642,
+    "lon": 153.4166,
+    "category": "urban_park",
+    "description": "Waterfront Gold Coast parklands with lagoons, playgrounds and skate facilities."
+  },
+  {
+    "rank": 6,
+    "name": "Daisy Hill Conservation Park",
+    "locality": "Daisy Hill, QLD",
+    "lat": -27.6333,
+    "lon": 153.1000,
+    "category": "conservation_park",
+    "description": "Eucalypt forest reserve near Logan, home to the Daisy Hill Koala Centre."
+  },
+  {
+    "rank": 7,
+    "name": "New Farm Park",
+    "locality": "New Farm, QLD",
+    "lat": -27.4667,
+    "lon": 153.0500,
+    "category": "urban_park",
+    "description": "Historic riverside park known for its rose garden and jacaranda trees."
+  },
+  {
+    "rank": 8,
+    "name": "Roma Street Parkland",
+    "locality": "Brisbane City, QLD",
+    "lat": -27.4644,
+    "lon": 153.0186,
+    "category": "urban_park",
+    "description": "The world's largest subtropical garden in a city centre, next to Roma Street Station."
+  },
+  {
+    "rank": 9,
+    "name": "Karawatha Forest Park",
+    "locality": "Karawatha, QLD",
+    "lat": -27.6167,
+    "lon": 153.0667,
+    "category": "regional_park",
+    "description": "Large native bushland reserve on Brisbane's southside with walking and cycling trails."
+  },
+  {
+    "rank": 10,
+    "name": "Coombabah Lake Conservation Park",
+    "locality": "Coombabah, QLD",
+    "lat": -27.9167,
+    "lon": 153.3833,
+    "category": "conservation_park",
+    "description": "Wetlands and mangrove reserve on the Gold Coast Broadwater, popular for birdwatching."
+  }
+]

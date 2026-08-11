@@ -1,0 +1,49 @@
+########################################################################
+# Park Visits dashboard
+#
+# Import this as a YAML Lovelace dashboard (Settings > Dashboards > "+"
+# > "New dashboard from scratch" > three-dot menu > "Edit in YAML", then
+# paste this file's contents), or reference it directly if you run your
+# whole HA UI in YAML mode.
+#
+# Requires the "Park Visits" integration to be installed and configured
+# first (Settings > Devices & Services > Add Integration > Park Visits).
+########################################################################
+title: Park Visits
+views:
+  - title: Map
+    path: map
+    icon: mdi:map-legend
+    cards:
+      - type: map
+        title: Parks within range of Cornubia
+        geo_location_sources:
+          - park_visits
+        default_zoom: 8
+        aspect_ratio: "16:9"
+      - type: entities
+        title: Summary
+        entities:
+          - entity: sensor.nearby_parks
+            name: Parks tracked
+
+  - title: List
+    path: list
+    icon: mdi:format-list-bulleted
+    cards:
+      - type: markdown
+        title: Top parks near Cornubia
+        content: >
+          {% set parks = states.geo_location
+             | selectattr('attributes.source', 'eq', 'park_visits')
+             | sort(attribute='attributes.rank')
+             | list %}
+
+          **{{ parks | length }} parks tracked, ranked by curated popularity**
+
+
+          | # | Park | Category | Locality | Distance |
+          |---|------|----------|----------|----------|
+          {% for p in parks -%}
+          | {{ p.attributes.rank }} | {{ p.name }} | {{ (p.attributes.category or '') | replace('_', ' ') | title }} | {{ p.attributes.locality }} | {{ '%.1f' | format(p.attributes.distance | float(0)) }} km |
+          {% endfor %}

@@ -1,0 +1,33 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Park Visits",
+        "description": "Choose the centre point, search radius and how many parks to track. Defaults to Cornubia, QLD.",
+        "data": {
+          "latitude": "Centre latitude",
+          "longitude": "Centre longitude",
+          "radius_km": "Radius (km)",
+          "max_parks": "Number of parks to show"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Park Visits is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Park Visits options",
+        "description": "Adjust the centre point, radius or number of parks shown.",
+        "data": {
+          "latitude": "Centre latitude",
+          "longitude": "Centre longitude",
+          "radius_km": "Radius (km)",
+          "max_parks": "Number of parks to show"
+        }
+      }
+    }
+  }
+}
