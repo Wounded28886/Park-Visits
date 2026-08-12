@@ -48,6 +48,18 @@ function escapeHtml(value) {
   );
 }
 
+// OSM's own tile servers require a Referer header identifying the calling
+// site and 403 anything that doesn't send one they recognise — common
+// through reverse proxies/tunnels, or when the browser's referrer policy
+// strips it. CARTO's free basemaps don't enforce that, so they're the
+// default here; override via card config (tile_url/tile_attribution) if
+// you'd rather point at your own tile server.
+const DEFAULT_TILE_URL_DARK = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+const DEFAULT_TILE_URL_LIGHT = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+const DEFAULT_TILE_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
+  '&copy; <a href="https://carto.com/attributions">CARTO</a>';
+
 class ParkVisitsMapCard extends HTMLElement {
   setConfig(config) {
     this.config = {
@@ -117,9 +129,12 @@ class ParkVisitsMapCard extends HTMLElement {
     const L = await loadLeaflet();
     const mapEl = this.querySelector("#map");
     this._map = L.map(mapEl);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19,
+    const isDark = this._pendingHass?.themes?.darkMode ?? true;
+    const tileUrl = this.config.tile_url || (isDark ? DEFAULT_TILE_URL_DARK : DEFAULT_TILE_URL_LIGHT);
+    L.tileLayer(tileUrl, {
+      attribution: this.config.tile_attribution || DEFAULT_TILE_ATTRIBUTION,
+      maxZoom: 20,
+      subdomains: "abcd",
     }).addTo(this._map);
     this._map.setView(
       [this.config.latitude ?? 0, this.config.longitude ?? 0],
