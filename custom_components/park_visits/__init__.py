@@ -26,7 +26,7 @@ from .const import (
 from .coordinator import ParkVisitsCoordinator
 from .storage import ParkReviewStore
 
-PLATFORMS = ["geo_location", "sensor"]
+PLATFORMS = ["geo_location", "sensor", "button"]
 
 RATE_PARK_SCHEMA = vol.Schema(
     {

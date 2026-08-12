@@ -4,13 +4,18 @@ Queries the Google Places API (New) "Nearby Search" endpoint, tiled across
 several overlapping 50km-radius requests to cover the configured radius
 (Google caps a single request's radius at 50km), then ranks the combined,
 deduplicated results by rating and merges in our own stored reviews.
+
+There is no automatic polling — `update_interval` is deliberately None.
+The only things that ever trigger a Google API call are the initial fetch
+when the integration is set up (or its options change) and the
+"Refresh parks" button. Everything else (e.g. submitting a review) updates
+entities from already-fetched data.
 """
 from __future__ import annotations
 
 import logging
 import math
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import Any
 
 import aiohttp
@@ -37,7 +42,6 @@ from .const import (
     PLACES_API_MAX_RESULTS_PER_TILE,
     PLACES_API_MAX_TILE_RADIUS_KM,
     PLACES_API_NOISE_TYPES,
-    UPDATE_INTERVAL_HOURS,
 )
 from .storage import ParkReviewStore
 from .util import destination_point, haversine_km
@@ -104,7 +108,7 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(hours=UPDATE_INTERVAL_HOURS),
+            update_interval=None,  # manual refresh only — see module docstring
         )
         self.entry = entry
         self.reviews = reviews

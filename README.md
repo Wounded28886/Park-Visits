@@ -32,16 +32,22 @@ details and submit your own rating/note, which is stored locally.
   of every tracked park where clicking a marker opens a popup with the
   park's details, your past rating if any, and a small form to submit a
   new one — calling the service above directly from the map.
+- Adds a **"Refresh parks" button** entity. There is no automatic polling —
+  that button (plus the initial fetch on setup, or on an options change) is
+  the only thing that ever calls the Google API, so you control exactly
+  when quota gets spent.
 
 ## Installation
 
-Private repos aren't supported by HACS, so this is a manual install.
-
 ### 1. Install the integration
 
-1. Copy `custom_components/park_visits` into your Home Assistant
-   `config/custom_components/` directory.
-2. Restart Home Assistant.
+**Via HACS (recommended):** HACS > Integrations > ⋮ > Custom repositories
+> add `https://github.com/Wounded28886/Park-Visits` as category
+"Integration" (skip this if it's already added — search for "Park Visits"
+directly instead). Install it, then restart Home Assistant.
+
+**Manual:** copy `custom_components/park_visits` into your Home Assistant
+`config/custom_components/` directory, then restart Home Assistant.
 
 ### 2. Get a Google Places API key
 
@@ -66,12 +72,17 @@ Private repos aren't supported by HACS, so this is a manual install.
 
 ### 4. Install the custom map card
 
+HACS installs `custom_components/park_visits` but not the `www/` folder, so
+this step is always manual regardless of how you did step 1:
+
 1. Copy `www/park-visits-map-card.js` into your Home Assistant
    `config/www/` directory.
 2. **Settings > Dashboards > ⋮ > Resources > Add Resource**:
    - URL: `/local/park-visits-map-card.js`
    - Resource type: **JavaScript module**
-3. Refresh your browser.
+3. Hard-refresh your browser (a plain refresh can serve a cached, empty
+   copy of the resource URL — if the map card doesn't render, this is the
+   first thing to try, or bump the resource URL to `...js?v=2` etc.).
 
 ### 5. Add the dashboard
 
@@ -90,12 +101,19 @@ map card filters by the `source: park_visits` attribute, not entity ID.
 
 ## Refresh cost and cadence
 
-Every refresh tiles the configured radius into overlapping 50km-radius
-Nearby Search requests (Google's per-request cap), so cost scales with
-radius: the default 100km radius needs on the order of 15-20 requests per
-refresh. The coordinator refreshes **once every 24 hours** by default — a
-review submitted through the map card updates instantly and locally
-without using any API quota, since it never triggers a re-fetch.
+There is **no automatic polling**. The only things that call the Google
+API are: the initial fetch when you add the integration, a reload after
+you change its options (centre point, radius, count, or API key), and
+pressing the **"Refresh parks"** button. Everything else — including
+submitting a review through the map card — updates entities from
+already-fetched data and costs nothing.
+
+Every one of those fetches tiles the configured radius into overlapping
+50km-radius Nearby Search requests (Google's per-request cap), so cost
+scales with radius: the default 100km radius needs on the order of 15-20
+requests per press, roughly $0.35-0.60 at Basic field-tier pricing. Press
+it as often (or rarely) as you like — nothing else will call Google on
+your behalf.
 
 ## Architecture
 
@@ -110,6 +128,7 @@ custom_components/park_visits/
 ├── config_flow.py       # setup + options UI (API key, centre point, radius, count)
 ├── geo_location.py      # one GeolocationEvent entity per tracked park
 ├── sensor.py             # summary "Nearby Parks" count sensor
+├── button.py             # manual "Refresh parks" button — the only trigger for an API call
 ├── services.yaml         # rate_park service description (Developer Tools UI)
 └── strings.json / translations/en.json
 www/

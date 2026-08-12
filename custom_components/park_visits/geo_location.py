@@ -30,9 +30,26 @@ ICON = "mdi:tree"
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Set up one geo_location entity per tracked park."""
+    """Set up one geo_location entity per tracked park.
+
+    A manual refresh can bring in parks that weren't part of the previous
+    fetch (a new top-N entrant after a rating change, say), so new entities
+    are added as they show up in later coordinator updates too — not just
+    once at startup. Parks that drop out of the current list keep their
+    entity (it just goes unavailable) rather than being removed, so their
+    history/logbook isn't lost.
+    """
     coordinator: ParkVisitsCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    async_add_entities(ParkGeolocationEvent(coordinator, park) for park in coordinator.data)
+    known_ids: set[str] = set()
+
+    def _add_new_entities() -> None:
+        new_parks = [park for park in coordinator.data if park.unique_id not in known_ids]
+        if new_parks:
+            known_ids.update(park.unique_id for park in new_parks)
+            async_add_entities(ParkGeolocationEvent(coordinator, park) for park in new_parks)
+
+    _add_new_entities()
+    entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))
 
 
 class ParkGeolocationEvent(CoordinatorEntity[ParkVisitsCoordinator], GeolocationEvent):
