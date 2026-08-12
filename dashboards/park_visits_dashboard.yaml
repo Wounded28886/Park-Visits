@@ -32,6 +32,8 @@ views:
         entities:
           - entity: sensor.nearby_parks
             name: Parks tracked
+          - entity: button.refresh_parks
+            name: Refresh from Google
 
   - title: List
     path: list

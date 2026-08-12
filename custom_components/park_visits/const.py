@@ -25,11 +25,6 @@ SOURCE = DOMAIN
 
 ATTRIBUTION = "Places data © Google. Ratings and reviews are from Google Maps users."
 
-# Update interval is deliberately long: each refresh tiles several Nearby
-# Search requests to cover the configured radius (Google caps a single
-# request at 50km), and Places API is billed per request.
-UPDATE_INTERVAL_HOURS = 24
-
 ATTR_RANK = "rank"
 ATTR_CATEGORIES = "categories"
 ATTR_ADDRESS = "address"
