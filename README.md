@@ -28,10 +28,15 @@ details and submit your own rating/note, which is stored locally.
   `place_id`, a `rating` (0-10) and an optional `note` to record what you
   thought of it. Reviews are stored locally (`.storage`, keyed by Google's
   place_id) and survive dataset refreshes.
-- Ships a **custom Lovelace card** (`park-visits-map-card`): a Leaflet map
-  of every tracked park where clicking a marker opens a popup with the
-  park's details, your past rating if any, and a small form to submit a
-  new one — calling the service above directly from the map.
+- Ships two **custom Lovelace cards**:
+  - `park-visits-map-card` — a Leaflet map of every tracked park where
+    clicking a marker opens a popup with the park's details, your past
+    rating if any, and a small form to submit a new one, calling the
+    service above directly from the map.
+  - `park-visits-table-card` — a spreadsheet-style table: click any column
+    header to sort by it, click again to reverse. Numeric columns sort
+    numerically (not alphabetically) and unrated parks always sort to the
+    bottom in both directions. Includes a quick text filter.
 - Adds a **"Refresh parks" button** entity. There is no automatic polling —
   that button (plus the initial fetch on setup, or on an options change) is
   the only thing that ever calls the Google API, so you control exactly
@@ -70,19 +75,21 @@ directly instead). Install it, then restart Home Assistant.
 3. You can change these later via the integration's **Configure** button
    — this triggers a reload and regenerates the tracked parks.
 
-### 4. Install the custom map card
+### 4. Install the custom cards
 
 HACS installs `custom_components/park_visits` but not the `www/` folder, so
 this step is always manual regardless of how you did step 1:
 
-1. Copy `www/park-visits-map-card.js` into your Home Assistant
-   `config/www/` directory.
-2. **Settings > Dashboards > ⋮ > Resources > Add Resource**:
-   - URL: `/local/park-visits-map-card.js`
-   - Resource type: **JavaScript module**
-3. Hard-refresh your browser (a plain refresh can serve a cached, empty
-   copy of the resource URL — if the map card doesn't render, this is the
-   first thing to try, or bump the resource URL to `...js?v=2` etc.).
+1. Copy both `www/park-visits-map-card.js` and
+   `www/park-visits-table-card.js` into your Home Assistant `config/www/`
+   directory.
+2. **Settings > Dashboards > ⋮ > Resources > Add Resource** — once for each:
+   - URL: `/local/park-visits-map-card.js` — type **JavaScript module**
+   - URL: `/local/park-visits-table-card.js` — type **JavaScript module**
+3. Hard-refresh your browser (a plain refresh can serve a cached copy of a
+   resource URL — if a card doesn't render or doesn't pick up an update,
+   this is the first thing to try, or bump the resource URL to
+   `...js?v=2` etc.).
 
 ### 5. Add the dashboard
 
@@ -132,7 +139,8 @@ custom_components/park_visits/
 ├── services.yaml         # rate_park service description (Developer Tools UI)
 └── strings.json / translations/en.json
 www/
-└── park-visits-map-card.js   # custom Lovelace card: map + click-to-rate popups
+├── park-visits-map-card.js     # custom card: map + click-to-rate popups
+└── park-visits-table-card.js   # custom card: sortable/filterable table
 dashboards/
 └── park_visits_dashboard.yaml
 ```

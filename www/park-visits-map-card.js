@@ -106,6 +106,10 @@ class ParkVisitsMapCard extends HTMLElement {
   }
 
   disconnectedCallback() {
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+      this._resizeObserver = null;
+    }
     if (this._map) {
       this._map.remove();
       this._map = null;
@@ -113,6 +117,7 @@ class ParkVisitsMapCard extends HTMLElement {
     this._markers.clear();
     this._built = false;
     this._fitDone = false;
+    this._lastBounds = null;
   }
 
   async _buildCard() {
@@ -170,9 +175,39 @@ class ParkVisitsMapCard extends HTMLElement {
       this.config.default_zoom
     );
 
+    // Dashboard cards are laid out by the sections grid *after* they render,
+    // so Leaflet frequently initialises against a zero-width container. It
+    // caches that size, loads a handful of misplaced tiles, and positions
+    // markers against a viewport that doesn't exist — the map looks like
+    // scattered tile fragments with no pins. Leaflet only recomputes when
+    // told to, so nudge it from three independent angles: a resize observer
+    // for genuine layout changes, a frame/tick after build for the common
+    // "sized moments later" case, and _render (see below) as the backstop.
+    // invalidateSize() is a no-op when the size hasn't actually changed.
+    this._resizeObserver = new ResizeObserver(() => this._refreshSize());
+    this._resizeObserver.observe(mapEl);
+    requestAnimationFrame(() => this._refreshSize());
+    setTimeout(() => this._refreshSize(), 250);
+
     if (this._pendingHass) {
       this._render(this._pendingHass);
     }
+  }
+
+  _refreshSize() {
+    if (!this._map) return;
+    this._map.invalidateSize();
+    this._maybeFitBounds();
+  }
+
+  _maybeFitBounds() {
+    // Fitting to bounds against a zero-size viewport yields a nonsense zoom,
+    // so hold off until the container actually has width.
+    if (this._fitDone || !this._map || !this._lastBounds || !this._lastBounds.length) return;
+    const size = this._map.getSize();
+    if (size.x < 1 || size.y < 1) return;
+    this._map.fitBounds(this._lastBounds, { padding: [20, 20] });
+    this._fitDone = true;
   }
 
   set hass(hass) {
@@ -188,6 +223,11 @@ class ParkVisitsMapCard extends HTMLElement {
 
   _render(hass) {
     const L = window.L;
+    // Backstop for the sizing problem described in _buildCard: Home Assistant
+    // pushes a hass update on every state change, so even if the resize
+    // observer never fires (or the card was laid out while hidden, e.g. on a
+    // background dashboard tab), the map corrects itself on the next update.
+    this._map.invalidateSize();
     const entities = this._parkEntities(hass);
     const seen = new Set();
     const bounds = [];
@@ -243,10 +283,8 @@ class ParkVisitsMapCard extends HTMLElement {
       }
     }
 
-    if (!this._fitDone && bounds.length) {
-      this._map.fitBounds(bounds, { padding: [20, 20] });
-      this._fitDone = true;
-    }
+    this._lastBounds = bounds;
+    this._maybeFitBounds();
   }
 
   _popupContent(state) {

@@ -39,23 +39,10 @@ views:
     path: list
     icon: mdi:format-list-bulleted
     cards:
-      # Distance is the geo_location entity's STATE, not an attribute —
-      # reading p.attributes.distance raises UndefinedError and blanks the
-      # whole card. Attributes are read with .get() for the same reason:
-      # one missing key would otherwise take out the entire table.
-      - type: markdown
-        title: Top parks by rating
-        content: >
-          {% set parks = states.geo_location
-             | selectattr('attributes.source', 'eq', 'park_visits')
-             | sort(attribute='attributes.rank')
-             | list %}
-
-          **{{ parks | length }} parks tracked, ranked by Google rating**
-
-
-          | # | Park | Rating | Categories | Distance | Your rating |
-          |---|------|--------|------------|----------|--------------|
-          {% for p in parks -%}
-          | {{ p.attributes.get('rank', '—') }} | {{ p.name }} | {% if p.attributes.get('rating') is not none %}{{ '%.1f' | format(p.attributes.get('rating') | float(0)) }} ({{ p.attributes.get('rating_count', 0) }}){% else %}—{% endif %} | {{ (p.attributes.get('categories') or []) | join(', ') }} | {{ '%.1f' | format(p.state | float(0)) }} km | {% if p.attributes.get('our_rating') is not none %}{{ p.attributes.get('our_rating') }}/10{% else %}—{% endif %} |
-          {% endfor %}
+      # Click any column header to sort by it; click again to reverse.
+      - type: custom:park-visits-table-card
+        title: Top parks
+        source: park_visits
+        default_sort: rank
+        default_direction: asc
+        show_filter: true
