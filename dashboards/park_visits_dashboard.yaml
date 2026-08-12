@@ -6,8 +6,13 @@
 # paste this file's contents), or reference it directly if you run your
 # whole HA UI in YAML mode.
 #
-# Requires the "Park Visits" integration to be installed and configured
-# first (Settings > Devices & Services > Add Integration > Park Visits).
+# Requires:
+#  - The "Park Visits" integration installed and configured with a Google
+#    Places API key (Settings > Devices & Services > Add Integration >
+#    Park Visits).
+#  - www/park-visits-map-card.js copied to config/www/ and registered as a
+#    dashboard resource (Settings > Dashboards > Resources > Add Resource,
+#    URL "/local/park-visits-map-card.js", type "JavaScript module").
 ########################################################################
 title: Park Visits
 views:
@@ -15,12 +20,13 @@ views:
     path: map
     icon: mdi:map-legend
     cards:
-      - type: map
-        title: Parks within range of Cornubia
-        geo_location_sources:
-          - park_visits
+      - type: custom:park-visits-map-card
+        title: Parks within range
+        source: park_visits
+        latitude: -27.6599
+        longitude: 153.2138
         default_zoom: 8
-        aspect_ratio: "16:9"
+        height: 600px
       - type: entities
         title: Summary
         entities:
@@ -32,18 +38,18 @@ views:
     icon: mdi:format-list-bulleted
     cards:
       - type: markdown
-        title: Top parks near Cornubia
+        title: Top parks by rating
         content: >
           {% set parks = states.geo_location
              | selectattr('attributes.source', 'eq', 'park_visits')
              | sort(attribute='attributes.rank')
              | list %}
 
-          **{{ parks | length }} parks tracked, ranked by curated popularity**
+          **{{ parks | length }} parks tracked, ranked by Google rating**
 
 
-          | # | Park | Category | Locality | Distance |
-          |---|------|----------|----------|----------|
+          | # | Park | Rating | Categories | Distance | Your rating |
+          |---|------|--------|------------|----------|--------------|
           {% for p in parks -%}
-          | {{ p.attributes.rank }} | {{ p.name }} | {{ (p.attributes.category or '') | replace('_', ' ') | title }} | {{ p.attributes.locality }} | {{ '%.1f' | format(p.attributes.distance | float(0)) }} km |
+          | {{ p.attributes.rank }} | {{ p.name }} | {{ '%.1f' | format(p.attributes.rating | float(0)) if p.attributes.rating is not none else '—' }} ({{ p.attributes.rating_count or 0 }}) | {{ (p.attributes.categories or []) | join(', ') }} | {{ '%.1f' | format(p.attributes.distance | float(0)) }} km | {{ p.attributes.our_rating ~ '/10' if p.attributes.our_rating is not none else '—' }} |
           {% endfor %}

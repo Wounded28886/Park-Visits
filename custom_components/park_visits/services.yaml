@@ -1,0 +1,27 @@
+rate_park:
+  name: Rate a park
+  description: Record your own rating and note for a tracked park.
+  fields:
+    place_id:
+      name: Park
+      description: The Google place_id of the park (the geo_location entity's place_id attribute).
+      required: true
+      selector:
+        text:
+    rating:
+      name: Rating
+      description: Your rating out of 10.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.5
+          mode: slider
+    note:
+      name: Note
+      description: What you thought of it.
+      required: false
+      selector:
+        text:
+          multiline: true

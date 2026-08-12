@@ -7,7 +7,21 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import ATTR_CATEGORY, ATTR_DESCRIPTION, ATTR_LOCALITY, ATTR_RANK, ATTRIBUTION, DOMAIN, SOURCE
+from .const import (
+    ATTR_ADDRESS,
+    ATTR_CATEGORIES,
+    ATTR_GOOGLE_MAPS_URI,
+    ATTR_OUR_NOTE,
+    ATTR_OUR_RATING,
+    ATTR_OUR_REVIEWED_AT,
+    ATTR_PLACE_ID,
+    ATTR_RANK,
+    ATTR_RATING,
+    ATTR_RATING_COUNT,
+    ATTRIBUTION,
+    DOMAIN,
+    SOURCE,
+)
 from .coordinator import ParkVisitsCoordinator, RankedPark
 
 ICON = "mdi:tree"
@@ -17,7 +31,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up one geo_location entity per tracked park."""
-    coordinator: ParkVisitsCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: ParkVisitsCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     async_add_entities(ParkGeolocationEvent(coordinator, park) for park in coordinator.data)
 
 
@@ -69,7 +83,13 @@ class ParkGeolocationEvent(CoordinatorEntity[ParkVisitsCoordinator], Geolocation
             return {}
         return {
             ATTR_RANK: park.rank,
-            ATTR_CATEGORY: park.category,
-            ATTR_LOCALITY: park.locality,
-            ATTR_DESCRIPTION: park.description,
+            ATTR_PLACE_ID: park.place_id,
+            ATTR_CATEGORIES: park.categories,
+            ATTR_ADDRESS: park.address,
+            ATTR_RATING: park.rating,
+            ATTR_RATING_COUNT: park.rating_count,
+            ATTR_GOOGLE_MAPS_URI: park.google_maps_uri,
+            ATTR_OUR_RATING: park.our_rating,
+            ATTR_OUR_NOTE: park.our_note,
+            ATTR_OUR_REVIEWED_AT: park.our_reviewed_at,
         }

@@ -23,7 +23,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up the summary sensor."""
-    coordinator: ParkVisitsCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: ParkVisitsCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     async_add_entities([ParkCountSensor(coordinator, entry)])
 
 

@@ -3,14 +3,18 @@
     "step": {
       "user": {
         "title": "Set up Park Visits",
-        "description": "Choose the centre point, search radius and how many parks to track. Defaults to Cornubia, QLD.",
+        "description": "Enter your Google Places API key and choose the centre point and search radius. Defaults to Cornubia, QLD.",
         "data": {
+          "api_key": "Google Places API key",
           "latitude": "Centre latitude",
           "longitude": "Centre longitude",
           "radius_km": "Radius (km)",
           "max_parks": "Number of parks to show"
         }
       }
+    },
+    "error": {
+      "api_key_required": "A Google Places API key is required."
     },
     "abort": {
       "already_configured": "Park Visits is already configured."
@@ -20,14 +24,18 @@
     "step": {
       "init": {
         "title": "Park Visits options",
-        "description": "Adjust the centre point, radius or number of parks shown.",
+        "description": "Adjust the API key, centre point, radius or number of parks shown.",
         "data": {
+          "api_key": "Google Places API key",
           "latitude": "Centre latitude",
           "longitude": "Centre longitude",
           "radius_km": "Radius (km)",
           "max_parks": "Number of parks to show"
         }
       }
+    },
+    "error": {
+      "api_key_required": "A Google Places API key is required."
     }
   }
 }
