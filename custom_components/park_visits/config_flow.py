@@ -85,14 +85,18 @@ class ParkVisitsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> ParkVisitsOptionsFlow:
         """Get the options flow for this handler."""
-        return ParkVisitsOptionsFlow(config_entry)
+        return ParkVisitsOptionsFlow()
 
 
 class ParkVisitsOptionsFlow(config_entries.OptionsFlow):
-    """Handle options for Park Visits (change API key, centre point, radius, count)."""
+    """Handle options for Park Visits (change API key, centre point, radius, count).
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
+    Deliberately no __init__ override: recent Home Assistant versions inject
+    self.config_entry automatically and raise if a subclass assigns it
+    manually. The old `def __init__(self, config_entry): self.config_entry =
+    config_entry` pattern (still shown in a lot of older tutorials) broke
+    this silently — every attempt to read this entry's options raised here.
+    """
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
