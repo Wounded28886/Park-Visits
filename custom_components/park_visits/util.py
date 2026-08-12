@@ -1,12 +1,7 @@
-"""Helpers for the Park Visits integration."""
+"""Geo helpers for the Park Visits integration."""
 from __future__ import annotations
 
-import json
-from math import asin, cos, radians, sin, sqrt
-from pathlib import Path
-from typing import Any
-
-DATA_FILE = Path(__file__).parent / "data" / "parks.json"
+from math import asin, atan2, cos, degrees, radians, sin, sqrt
 
 EARTH_RADIUS_KM = 6371.0088
 
@@ -20,7 +15,18 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * EARTH_RADIUS_KM * asin(sqrt(a))
 
 
-def load_parks() -> list[dict[str, Any]]:
-    """Load the bundled curated parks dataset."""
-    with DATA_FILE.open(encoding="utf-8") as parks_file:
-        return json.load(parks_file)
+def destination_point(
+    lat: float, lon: float, distance_km: float, bearing_deg: float
+) -> tuple[float, float]:
+    """Return the point `distance_km` from (lat, lon) along `bearing_deg` (0=N, 90=E)."""
+    lat_r, lon_r, bearing_r = radians(lat), radians(lon), radians(bearing_deg)
+    angular_distance = distance_km / EARTH_RADIUS_KM
+
+    dest_lat_r = asin(
+        sin(lat_r) * cos(angular_distance) + cos(lat_r) * sin(angular_distance) * cos(bearing_r)
+    )
+    dest_lon_r = lon_r + atan2(
+        sin(bearing_r) * sin(angular_distance) * cos(lat_r),
+        cos(angular_distance) - sin(lat_r) * sin(dest_lat_r),
+    )
+    return degrees(dest_lat_r), degrees(dest_lon_r)
