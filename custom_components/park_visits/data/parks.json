@@ -1,0 +1,1092 @@
+[
+  {
+    "rank": 1,
+    "name": "Lamington National Park",
+    "locality": "Canungra, QLD",
+    "lat": -28.1387,
+    "lon": 153.1092,
+    "category": "national_park",
+    "description": "UNESCO World Heritage-listed Gondwana rainforest park famed for the Border Track, ancient Antarctic beech forests, and O'Reilly's treetop canopy walk.",
+    "popularity_note": "One of SE Queensland's most iconic national parks and a major international tourist drawcard."
+  },
+  {
+    "rank": 2,
+    "name": "Springbrook National Park",
+    "locality": "Springbrook, QLD",
+    "lat": -28.174,
+    "lon": 153.2712,
+    "category": "national_park",
+    "description": "Gold Coast hinterland World Heritage rainforest park known for Purlingbrook Falls, the Best of All Lookout and glow-worm caves at Natural Bridge.",
+    "popularity_note": "Extremely popular day-trip destination from the Gold Coast/Brisbane; frequently ranked among Queensland's top natural attractions."
+  },
+  {
+    "rank": 3,
+    "name": "South Bank Parklands",
+    "locality": "South Brisbane, QLD",
+    "lat": -27.4759,
+    "lon": 153.0217,
+    "category": "urban_park",
+    "description": "Riverside cultural precinct with the artificial Streets Beach lagoon, rainforest walk and Grand Arbour, built on the 1988 Expo site.",
+    "popularity_note": "One of the most visited urban parks in Australia, a top Brisbane tourist attraction."
+  },
+  {
+    "rank": 4,
+    "name": "Tamborine National Park",
+    "locality": "North Tamborine, QLD",
+    "lat": -27.8603,
+    "lon": 153.1783,
+    "category": "national_park",
+    "description": "A series of rainforest reserves across Mount Tamborine featuring waterfalls such as Witches Falls, Cedar Creek Falls and Curtis Falls.",
+    "popularity_note": "Iconic Gold Coast hinterland destination combined with the popular Gallery Walk village."
+  },
+  {
+    "rank": 5,
+    "name": "D'Aguilar National Park",
+    "locality": "Mount Nebo, QLD",
+    "lat": -27.3089,
+    "lon": 152.7778,
+    "category": "national_park",
+    "description": "Brisbane's largest and closest wilderness escape, covering the D'Aguilar Range with walking trails, waterfalls and lookouts over the city.",
+    "popularity_note": "Extremely popular with Brisbane residents for hiking, cycling and picnicking; formerly known as Brisbane Forest Park."
+  },
+  {
+    "rank": 6,
+    "name": "Brisbane Botanic Gardens, Mount Coot-tha",
+    "locality": "Toowong, QLD",
+    "lat": -27.4765,
+    "lon": 152.9761,
+    "category": "botanic_garden",
+    "description": "76-hectare subtropical botanic gardens at the foot of Mount Coot-tha with a Japanese garden, tropical dome and planetarium.",
+    "popularity_note": "Extremely popular free attraction combined with the Mount Coot-tha Lookout and Summit precinct."
+  },
+  {
+    "rank": 7,
+    "name": "Moreton Island National Park (Gheebulum Kunungai)",
+    "locality": "Moreton Island, QLD",
+    "lat": -27.0525,
+    "lon": 153.3911,
+    "category": "national_park",
+    "description": "Sand island national park covering 98% of Moreton Island, home to the Tangalooma wrecks, towering dunes and Mount Tempest.",
+    "popularity_note": "Major eco-tourism drawcard off Brisbane, popular for 4WD touring, dune sandboarding and dolphin feeding."
+  },
+  {
+    "rank": 8,
+    "name": "Naree Budjong Djara National Park",
+    "locality": "North Stradbroke Island, QLD",
+    "lat": -27.6607,
+    "lon": 153.439,
+    "category": "national_park",
+    "description": "Covers much of North Stradbroke Island (Minjerribah), protecting dune lakes, wallum heath and pristine beaches.",
+    "popularity_note": "Hugely popular island getaway close to Brisbane and Redlands; iconic surf and camping destination."
+  },
+  {
+    "rank": 9,
+    "name": "City Botanic Gardens",
+    "locality": "Brisbane City, QLD",
+    "lat": -27.475,
+    "lon": 153.0306,
+    "category": "botanic_garden",
+    "description": "Brisbane's oldest park, established in 1855 on the Brisbane River bend beside the CBD, with historic Moreton Bay fig avenues.",
+    "popularity_note": "One of Brisbane's most visited green spaces, adjacent to Parliament House and the CBD."
+  },
+  {
+    "rank": 10,
+    "name": "Glass House Mountains National Park",
+    "locality": "Glass House Mountains, QLD",
+    "lat": -26.93,
+    "lon": 152.95,
+    "category": "national_park",
+    "description": "A cluster of dramatic volcanic plugs including Mount Tibrogargan and Mount Beerwah, sacred to the Jinibara and Gubbi Gubbi peoples.",
+    "popularity_note": "Iconic, highly photographed SE Queensland landmark and popular hiking/climbing destination."
+  },
+  {
+    "rank": 11,
+    "name": "New Farm Park",
+    "locality": "New Farm, QLD",
+    "lat": -27.4677,
+    "lon": 153.05,
+    "category": "urban_park",
+    "description": "Historic riverside park famed for its jacaranda and poinciana avenues, rose garden and Brisbane Powerhouse arts precinct nearby.",
+    "popularity_note": "One of Brisbane's best-loved heritage parks, especially popular in jacaranda season."
+  },
+  {
+    "rank": 12,
+    "name": "Burleigh Head National Park",
+    "locality": "Burleigh Heads, QLD",
+    "lat": -28.0953,
+    "lon": 153.4572,
+    "category": "national_park",
+    "description": "Small headland rainforest reserve on the Gold Coast with coastal walking tracks, lookouts and views over the Burleigh surf break.",
+    "popularity_note": "Extremely popular Gold Coast walk right beside a famous surf beach, visited by locals and tourists alike."
+  },
+  {
+    "rank": 13,
+    "name": "Roma Street Parkland",
+    "locality": "Brisbane City, QLD",
+    "lat": -27.4636,
+    "lon": 153.0189,
+    "category": "urban_park",
+    "description": "The world's largest subtropical garden in a city centre, with themed gardens, a lake and forest walk beside Roma Street station.",
+    "popularity_note": "Major Brisbane CBD attraction popular for events, weddings and lunchtime escapes."
+  },
+  {
+    "rank": 14,
+    "name": "Mount Barney National Park",
+    "locality": "Rathdowney, QLD",
+    "lat": -28.2736,
+    "lon": 152.6619,
+    "category": "national_park",
+    "description": "Rugged Scenic Rim wilderness centred on the pyramidal Mount Barney massif, a challenging and iconic hiking peak.",
+    "popularity_note": "Renowned among serious bushwalkers as one of SE Queensland's premier peak-climbing destinations."
+  },
+  {
+    "rank": 15,
+    "name": "Main Range National Park",
+    "locality": "Aratula, QLD",
+    "lat": -28.05,
+    "lon": 152.4,
+    "category": "national_park",
+    "description": "Border Ranges World Heritage park along the Great Dividing Range, including Cunninghams Gap and Spicers Gap with panoramic escarpment views.",
+    "popularity_note": "Well-known hiking destination on the Cunningham Highway, popular for its ridge-top rainforest walks."
+  },
+  {
+    "rank": 16,
+    "name": "Daisy Hill Conservation Park",
+    "locality": "Daisy Hill, QLD",
+    "lat": -27.6286,
+    "lon": 153.1602,
+    "category": "conservation_park",
+    "description": "Open eucalypt forest reserve south of Brisbane, home to the Daisy Hill Koala Centre and an extensive mountain-bike trail network.",
+    "popularity_note": "Very well-known Logan-area attraction thanks to the koala centre and popular MTB trails."
+  },
+  {
+    "rank": 17,
+    "name": "Moogerah Peaks National Park",
+    "locality": "Kalbar, QLD",
+    "lat": -27.9844,
+    "lon": 152.6181,
+    "category": "national_park",
+    "description": "Four dramatic volcanic peaks near Lake Moogerah, including Mount French, Mount Greville and Mount Edwards, popular with rock climbers.",
+    "popularity_note": "Well-regarded Scenic Rim climbing and hiking destination overlooking Lake Moogerah."
+  },
+  {
+    "rank": 18,
+    "name": "Bribie Island National Park",
+    "locality": "Bribie Island, QLD",
+    "lat": -27.05,
+    "lon": 153.15,
+    "category": "national_park",
+    "description": "Protects the northern two-thirds of Bribie Island, with coastal heath, pandanus-lined beaches and the Pumicestone Passage.",
+    "popularity_note": "Popular Moreton Bay island escape for camping, fishing and 4WDing, close to Brisbane and the Sunshine Coast."
+  },
+  {
+    "rank": 19,
+    "name": "Broadwater Parklands",
+    "locality": "Southport, QLD",
+    "lat": -27.969,
+    "lon": 153.423,
+    "category": "urban_park",
+    "description": "Three kilometres of landscaped foreshore along the Gold Coast Broadwater with a water play park and swimming lagoon.",
+    "popularity_note": "Major Gold Coast family attraction and events venue on the Southport foreshore."
+  },
+  {
+    "rank": 20,
+    "name": "Natural Bridge (Springbrook NP, Numinbah section)",
+    "locality": "Numinbah Valley, QLD",
+    "lat": -28.366,
+    "lon": 153.233,
+    "category": "national_park",
+    "description": "Separate Numinbah Valley section of Springbrook National Park where Cave Creek plunges through a rock arch into a glow-worm cave.",
+    "popularity_note": "One of the most photographed short walks in SE Queensland, famous for its glow-worms."
+  },
+  {
+    "rank": 21,
+    "name": "Karawatha Forest Park",
+    "locality": "Karawatha, QLD",
+    "lat": -27.6322,
+    "lon": 153.083,
+    "category": "regional_park",
+    "description": "900-hectare remnant eucalypt forest in Brisbane's south with a nature play/discovery centre, wetlands and an extensive trail network.",
+    "popularity_note": "Popular Brisbane southside bushland reserve for walking, mountain biking and birdwatching."
+  },
+  {
+    "rank": 22,
+    "name": "Naree Budjong Djara - Blue Lake section",
+    "locality": "Dunwich, QLD",
+    "lat": -27.53,
+    "lon": 153.445,
+    "category": "national_park",
+    "description": "A separate section of North Stradbroke Island national park protecting Blue Lake (Kaboora), a striking dune lake fringed by heath and forest.",
+    "popularity_note": "Popular half-day bushwalk destination on Stradbroke Island, well known among hikers."
+  },
+  {
+    "rank": 23,
+    "name": "Toohey Forest Park",
+    "locality": "Nathan, QLD",
+    "lat": -27.5367,
+    "lon": 153.0375,
+    "category": "regional_park",
+    "description": "260-hectare bushland reserve around Toohey Mountain with an extensive network of walking and mountain-bike trails near Griffith University.",
+    "popularity_note": "Popular inner-southside Brisbane bushwalking and trail-running destination."
+  },
+  {
+    "rank": 24,
+    "name": "Nerang National Park",
+    "locality": "Nerang, QLD",
+    "lat": -28.006,
+    "lon": 153.335,
+    "category": "national_park",
+    "description": "Hinterland rainforest and eucalypt forest park behind the Gold Coast, adjoining Hinze Dam with mountain-bike and walking trails.",
+    "popularity_note": "Popular Gold Coast mountain-biking destination close to Hinze Dam."
+  },
+  {
+    "rank": 25,
+    "name": "Venman Bushland National Park",
+    "locality": "Redland Bay, QLD",
+    "lat": -27.6275,
+    "lon": 153.2003,
+    "category": "national_park",
+    "description": "Small national park of open forest and rainforest gully protecting the endangered Redland greenhood orchid and other rare flora.",
+    "popularity_note": "A well-regarded local nature escape close to Cornubia and Redland Bay, popular for short walks."
+  },
+  {
+    "rank": 26,
+    "name": "Kangaroo Point Cliffs Park",
+    "locality": "Kangaroo Point, QLD",
+    "lat": -27.4767,
+    "lon": 153.0367,
+    "category": "urban_park",
+    "description": "Riverside park along dramatic river cliffs opposite the CBD, popular for abseiling, climbing and skyline picnics.",
+    "popularity_note": "Iconic Brisbane river-cliff park with sweeping CBD views, hugely popular with locals and tourists."
+  },
+  {
+    "rank": 27,
+    "name": "Maiala National Park",
+    "locality": "Mount Glorious, QLD",
+    "lat": -27.332,
+    "lon": 152.772,
+    "category": "national_park",
+    "description": "Small rainforest reserve at Mount Glorious in the D'Aguilar Range, popular for its walking tracks and picnic area.",
+    "popularity_note": "A well-loved Brisbane weekend drive and rainforest walk destination."
+  },
+  {
+    "rank": 28,
+    "name": "Wynnum Foreshore / Wynnum-Manly Esplanade Park",
+    "locality": "Wynnum, QLD",
+    "lat": -27.44,
+    "lon": 153.17,
+    "category": "urban_park",
+    "description": "Popular bayside esplanade with the Wynnum tidal pool, mangrove boardwalk and Manly Harbour promenade.",
+    "popularity_note": "One of Brisbane's most popular bayside recreation strips."
+  },
+  {
+    "rank": 29,
+    "name": "Queens Park, Ipswich",
+    "locality": "Ipswich, QLD",
+    "lat": -27.614,
+    "lon": 152.757,
+    "category": "urban_park",
+    "description": "Ipswich's premier heritage park featuring the Ipswich Nature Centre, botanic gardens, band rotunda and century-old fig trees.",
+    "popularity_note": "The best-known and most visited park in Ipswich."
+  },
+  {
+    "rank": 30,
+    "name": "Oxley Creek Common",
+    "locality": "Rocklea, QLD",
+    "lat": -27.546,
+    "lon": 152.997,
+    "category": "urban_park",
+    "description": "Riverside grassland and wetland reserve on the Brisbane River popular for birdwatching, with over 150 recorded bird species.",
+    "popularity_note": "Well-known Brisbane birdwatching hotspot and open green corridor."
+  },
+  {
+    "rank": 31,
+    "name": "Coombabah Lakelands Conservation Area",
+    "locality": "Coombabah, QLD",
+    "lat": -27.9094,
+    "lon": 153.3519,
+    "category": "conservation_park",
+    "description": "Nearly 2,000 hectares of wetland, eucalypt forest, saltmarsh and mangrove on the northern Gold Coast Broadwater.",
+    "popularity_note": "Well-regarded Gold Coast wetland reserve popular with birdwatchers and walkers."
+  },
+  {
+    "rank": 32,
+    "name": "Cascade Gardens",
+    "locality": "Broadbeach, QLD",
+    "lat": -28.034,
+    "lon": 153.43,
+    "category": "urban_park",
+    "description": "Large landscaped park in Broadbeach with a Vietnam War memorial, sensory garden and open lawns near Kurrawa Beach.",
+    "popularity_note": "Popular Gold Coast picnic and event park adjoining the Star Casino precinct."
+  },
+  {
+    "rank": 33,
+    "name": "White Rock - Spring Mountain Conservation Estate",
+    "locality": "Redbank Plains, QLD",
+    "lat": -27.715,
+    "lon": 152.805,
+    "category": "regional_park",
+    "description": "Over 2,500 hectares of bushland with sculpted rocky outcrops, significant to local Aboriginal heritage, spanning Ipswich's growth corridor.",
+    "popularity_note": "One of Ipswich's largest and most popular conservation estates for hiking, horse riding and mountain biking."
+  },
+  {
+    "rank": 34,
+    "name": "Hinze Dam Recreation Area / Country Road Park",
+    "locality": "Advancetown, QLD",
+    "lat": -28.07,
+    "lon": 153.267,
+    "category": "regional_park",
+    "description": "Recreation grounds around Hinze Dam in the Gold Coast hinterland offering picnic areas, walking trails and lake views.",
+    "popularity_note": "Popular Gold Coast hinterland picnic and lookout spot near Advancetown Lake."
+  },
+  {
+    "rank": 35,
+    "name": "The Spit / Doug Jennings Park",
+    "locality": "Main Beach, QLD",
+    "lat": -27.933,
+    "lon": 153.43,
+    "category": "urban_park",
+    "description": "Narrow sand spit park at the northern tip of the Gold Coast between the Broadwater and the Pacific Ocean.",
+    "popularity_note": "Popular Gold Coast beach, fishing and picnic destination near Sea World."
+  },
+  {
+    "rank": 36,
+    "name": "Boondall Wetlands Reserve",
+    "locality": "Boondall, QLD",
+    "lat": -27.367,
+    "lon": 153.08,
+    "category": "nature_reserve",
+    "description": "One of Brisbane's largest and most significant wetland reserves, with boardwalks through mangroves, saltmarsh and melaleuca forest.",
+    "popularity_note": "Well-known Brisbane birdwatching and environmental education destination."
+  },
+  {
+    "rank": 37,
+    "name": "Flinders Peak Conservation Park",
+    "locality": "Peak Crossing, QLD",
+    "lat": -27.733,
+    "lon": 152.617,
+    "category": "conservation_park",
+    "description": "Protects the dramatic Flinders Peak volcanic plug near Ipswich, a popular but challenging summit hike.",
+    "popularity_note": "Well-regarded Ipswich-area hiking peak, iconic on the region's skyline."
+  },
+  {
+    "rank": 38,
+    "name": "Wellington Point Reserve",
+    "locality": "Wellington Point, QLD",
+    "lat": -27.4833,
+    "lon": 153.2667,
+    "category": "urban_park",
+    "description": "Foreshore park famous for its tidal causeway walk out to King Island, a popular picnic and sunset-watching spot.",
+    "popularity_note": "One of Redland City's most-visited foreshore parks."
+  },
+  {
+    "rank": 39,
+    "name": "Currumbin Valley Rock Pools Reserve",
+    "locality": "Currumbin Valley, QLD",
+    "lat": -28.183,
+    "lon": 153.383,
+    "category": "regional_park",
+    "description": "Natural swimming holes along Currumbin Creek in the Gold Coast hinterland, a favourite local summer swimming spot.",
+    "popularity_note": "Very popular informal swimming destination for Gold Coast locals."
+  },
+  {
+    "rank": 40,
+    "name": "St Helena Island National Park",
+    "locality": "Moreton Bay, QLD",
+    "lat": -27.3917,
+    "lon": 153.2328,
+    "category": "national_park",
+    "description": "Small Moreton Bay island national park preserving the ruins of Queensland's former high-security prison, accessible only by tour boat.",
+    "popularity_note": "A unique and popular guided-tour heritage/nature destination in Moreton Bay."
+  },
+  {
+    "rank": 41,
+    "name": "Tallebudgera Creek Conservation Park",
+    "locality": "Tallebudgera, QLD",
+    "lat": -28.1167,
+    "lon": 153.4167,
+    "category": "conservation_park",
+    "description": "Bushland reserve flanking Tallebudgera Creek in the southern Gold Coast, popular for kayaking access and walking tracks.",
+    "popularity_note": "Well-used local reserve alongside a very popular Gold Coast waterway."
+  },
+  {
+    "rank": 42,
+    "name": "Flinders-Goolman Conservation Estate",
+    "locality": "Ipswich, QLD",
+    "lat": -27.72,
+    "lon": 152.64,
+    "category": "conservation_park",
+    "description": "Large council conservation estate surrounding Flinders Peak with extensive walking and mountain-bike trails.",
+    "popularity_note": "Popular Ipswich bushland reserve for hikers and mountain bikers."
+  },
+  {
+    "rank": 43,
+    "name": "Federation Walk Coastal Reserve",
+    "locality": "Main Beach, QLD",
+    "lat": -27.94,
+    "lon": 153.429,
+    "category": "nature_reserve",
+    "description": "Coastal dune reserve of remnant littoral rainforest along The Spit, with boardwalks through pandanus and banksia woodland.",
+    "popularity_note": "Well-known Gold Coast coastal walking track amid a very high-density tourist area."
+  },
+  {
+    "rank": 44,
+    "name": "White Rock Conservation Park",
+    "locality": "Ipswich, QLD",
+    "lat": -27.66,
+    "lon": 152.75,
+    "category": "conservation_park",
+    "description": "Sandstone ridge bushland reserve of rocky outcrops and eucalypt forest on Ipswich's eastern edge.",
+    "popularity_note": "Well-used local Ipswich reserve, part of the wider White Rock-Spring Mountain estate."
+  },
+  {
+    "rank": 45,
+    "name": "Point Danger Reserve",
+    "locality": "Coolangatta, QLD",
+    "lat": -28.167,
+    "lon": 153.55,
+    "category": "urban_park",
+    "description": "Headland reserve at the Queensland-NSW border with the Captain Cook Memorial Lighthouse and coastal views.",
+    "popularity_note": "Iconic southern Gold Coast lookout at the state border, popular tourist stop."
+  },
+  {
+    "rank": 46,
+    "name": "Anzac Square",
+    "locality": "Brisbane City, QLD",
+    "lat": -27.467,
+    "lon": 153.025,
+    "category": "urban_park",
+    "description": "Formal ceremonial park in the Brisbane CBD housing the Shrine of Remembrance and eternal flame.",
+    "popularity_note": "One of Brisbane's most symbolically significant and visited civic parks."
+  },
+  {
+    "rank": 47,
+    "name": "Colleges Crossing Reserve",
+    "locality": "Karalee, QLD",
+    "lat": -27.567,
+    "lon": 152.817,
+    "category": "regional_park",
+    "description": "Riverside recreation reserve on the Brisbane River near Ipswich with picnic areas, cycling trails and a swimming spot.",
+    "popularity_note": "Popular west-Brisbane/Ipswich family picnic and cycling destination."
+  },
+  {
+    "rank": 48,
+    "name": "Enoggera Reservoir Reserve (Walkabout Creek)",
+    "locality": "The Gap, QLD",
+    "lat": -27.433,
+    "lon": 152.927,
+    "category": "regional_park",
+    "description": "Recreation reserve around Enoggera Reservoir on the edge of D'Aguilar National Park, with the Walkabout Creek Discovery Centre.",
+    "popularity_note": "Popular Brisbane gateway to D'Aguilar National Park bushwalking and wildlife viewing."
+  },
+  {
+    "rank": 49,
+    "name": "Lake Moogerah Recreation Reserve",
+    "locality": "Moogerah, QLD",
+    "lat": -28.033,
+    "lon": 152.583,
+    "category": "regional_park",
+    "description": "Foreshore recreation area on Lake Moogerah beneath Mount Greville and Mount French, popular for camping and water sports.",
+    "popularity_note": "Well-known Scenic Rim camping and watersports destination."
+  },
+  {
+    "rank": 50,
+    "name": "Redcliffe Foreshore Parklands (Suttons Beach)",
+    "locality": "Redcliffe, QLD",
+    "lat": -27.233,
+    "lon": 153.117,
+    "category": "urban_park",
+    "description": "Landscaped bayside esplanade along the Redcliffe Peninsula, popular for walking, cycling and swimming enclosures.",
+    "popularity_note": "Well-loved Moreton Bay foreshore park in the City of Moreton Bay."
+  },
+  {
+    "rank": 51,
+    "name": "Musgrave Park",
+    "locality": "South Brisbane, QLD",
+    "lat": -27.4833,
+    "lon": 153.0167,
+    "category": "urban_park",
+    "description": "Historic South Brisbane park and significant Aboriginal cultural meeting place, home to community festivals and events.",
+    "popularity_note": "Culturally significant and well-known inner-Brisbane park."
+  },
+  {
+    "rank": 52,
+    "name": "Mount Walker Lookout",
+    "locality": "Mount Walker, QLD",
+    "lat": -27.783,
+    "lon": 152.567,
+    "category": "regional_park",
+    "description": "Scenic Rim lookout reserve renowned for its jacaranda-lined drive and sweeping views over the Fassifern Valley.",
+    "popularity_note": "Locally iconic in jacaranda season (Oct-Nov), popular day-trip lookout."
+  },
+  {
+    "rank": 53,
+    "name": "Teerk Roo Ra National Park (Peel Island)",
+    "locality": "Moreton Bay, QLD",
+    "lat": -27.503,
+    "lon": 153.35,
+    "category": "national_park",
+    "description": "Uninhabited Moreton Bay island national park with former lazaret ruins, mangroves and sandy beaches, reachable only by boat.",
+    "popularity_note": "Popular boating and kayaking destination between Cleveland and Stradbroke Island."
+  },
+  {
+    "rank": 54,
+    "name": "Robelle Domain Parkland",
+    "locality": "Springfield Central, QLD",
+    "lat": -27.666,
+    "lon": 152.92,
+    "category": "urban_park",
+    "description": "Large modern parkland in Ipswich's Springfield growth corridor with an amphitheatre, lake, boardwalks and play spaces.",
+    "popularity_note": "One of Ipswich's most popular contemporary parklands, a major community drawcard."
+  },
+  {
+    "rank": 55,
+    "name": "Coochiemudlo Island Foreshore Reserves",
+    "locality": "Coochiemudlo Island, QLD",
+    "lat": -27.583,
+    "lon": 153.317,
+    "category": "urban_park",
+    "description": "Foreshore parkland encircling Coochiemudlo Island in Moreton Bay, with Norfolk Beach a favourite family swimming spot.",
+    "popularity_note": "Popular small-island day-trip destination from Victoria Point in Redland City."
+  },
+  {
+    "rank": 56,
+    "name": "The Knoll, Tamborine National Park",
+    "locality": "North Tamborine, QLD",
+    "lat": -27.85,
+    "lon": 153.19,
+    "category": "national_park",
+    "description": "A separate rainforest section of Tamborine National Park with a short circuit walk and lookout over the Gold Coast hinterland.",
+    "popularity_note": "Popular short rainforest walk within the well-visited Tamborine Mountain precinct."
+  },
+  {
+    "rank": 57,
+    "name": "Wyaralong Dam Recreation Area",
+    "locality": "Beaudesert, QLD",
+    "lat": -27.96,
+    "lon": 152.77,
+    "category": "regional_park",
+    "description": "Recreation reserve around Wyaralong Dam in the Scenic Rim with walking trails, picnic areas and lake views.",
+    "popularity_note": "Popular Scenic Rim picnic and fishing destination."
+  },
+  {
+    "rank": 58,
+    "name": "Orleigh Park",
+    "locality": "West End, QLD",
+    "lat": -27.483,
+    "lon": 153.008,
+    "category": "urban_park",
+    "description": "Popular riverside park at West End with a sandy river beach, picnic areas and Brisbane River views.",
+    "popularity_note": "One of the most popular riverside parks in inner Brisbane."
+  },
+  {
+    "rank": 59,
+    "name": "Beerburrum State Forest",
+    "locality": "Beerburrum, QLD",
+    "lat": -26.95,
+    "lon": 152.983,
+    "category": "state_forest",
+    "description": "Pine plantation and bushland state forest at the foot of the Glass House Mountains, popular for the Wildhorse Mountain lookout hike.",
+    "popularity_note": "Popular Sunshine Coast-fringe hiking and mountain-biking state forest."
+  },
+  {
+    "rank": 60,
+    "name": "Raby Bay Foreshore Park",
+    "locality": "Cleveland, QLD",
+    "lat": -27.5167,
+    "lon": 153.274,
+    "category": "urban_park",
+    "description": "Landscaped esplanade park along Raby Bay in Cleveland, popular for walking, cycling and views over Moreton Bay.",
+    "popularity_note": "Well-used Redland City waterfront park near the Cleveland ferry terminal."
+  },
+  {
+    "rank": 61,
+    "name": "Purga Nature Reserve",
+    "locality": "Purga, QLD",
+    "lat": -27.73,
+    "lon": 152.74,
+    "category": "nature_reserve",
+    "description": "Ipswich-area reserve of open eucalypt forest providing habitat for koalas and other native wildlife.",
+    "popularity_note": "Locally significant koala habitat reserve near Ipswich."
+  },
+  {
+    "rank": 62,
+    "name": "Northbrook Parklands",
+    "locality": "Mount Crosby, QLD",
+    "lat": -27.533,
+    "lon": 152.75,
+    "category": "regional_park",
+    "description": "Seqwater-managed lakeside recreation area on Lake Wivenhoe near Mount Crosby, with camping, walking and mountain-bike trails.",
+    "popularity_note": "Popular Ipswich/Brisbane western-suburbs lake recreation destination."
+  },
+  {
+    "rank": 63,
+    "name": "Kings Beach Foreshore Reserve",
+    "locality": "Caloundra, QLD",
+    "lat": -26.802,
+    "lon": 153.136,
+    "category": "urban_park",
+    "description": "Popular Sunshine Coast beachfront parkland with an ocean-front swimming lagoon at Kings Beach.",
+    "popularity_note": "Well-known Sunshine Coast beachfront park at the region's southern gateway."
+  },
+  {
+    "rank": 64,
+    "name": "Riverheart Parkland",
+    "locality": "Ipswich, QLD",
+    "lat": -27.615,
+    "lon": 152.76,
+    "category": "urban_park",
+    "description": "Redeveloped linear parkland along the Bremer River in central Ipswich with boardwalks, playgrounds and river views.",
+    "popularity_note": "A flagship modern Ipswich riverside redevelopment, increasingly popular locally."
+  },
+  {
+    "rank": 65,
+    "name": "Samford Conservation Park",
+    "locality": "Samford Valley, QLD",
+    "lat": -27.367,
+    "lon": 152.883,
+    "category": "conservation_park",
+    "description": "Bushland reserve in the Samford Valley on Brisbane's north-western fringe, popular with walkers and mountain bikers.",
+    "popularity_note": "Well-used local reserve for the Samford Valley community."
+  },
+  {
+    "rank": 66,
+    "name": "Minnippi Parklands",
+    "locality": "Tingalpa, QLD",
+    "lat": -27.467,
+    "lon": 153.1,
+    "category": "urban_park",
+    "description": "Landscaped Brisbane parkland built around a lagoon and golf course, with cycling paths and picnic areas.",
+    "popularity_note": "Popular eastern-suburbs Brisbane recreation park."
+  },
+  {
+    "rank": 67,
+    "name": "JC Slaughter Falls Reserve",
+    "locality": "Mount Coot-tha, QLD",
+    "lat": -27.46,
+    "lon": 152.95,
+    "category": "regional_park",
+    "description": "Rainforest gully and seasonal waterfall within the Mount Coot-tha Forest reserve, with a network of walking trails.",
+    "popularity_note": "Popular short-walk destination within the well-visited Mount Coot-tha precinct."
+  },
+  {
+    "rank": 68,
+    "name": "Maroon Dam Recreation Reserve",
+    "locality": "Maroon, QLD",
+    "lat": -28.167,
+    "lon": 152.667,
+    "category": "regional_park",
+    "description": "Quiet camping and picnic reserve on Lake Maroon at the foot of Mount May in the Scenic Rim.",
+    "popularity_note": "Popular low-key Scenic Rim fishing and camping spot."
+  },
+  {
+    "rank": 69,
+    "name": "Eprapah Creek Environmental Reserve",
+    "locality": "Victoria Point, QLD",
+    "lat": -27.5814,
+    "lon": 153.2858,
+    "category": "nature_reserve",
+    "description": "Riparian bushland reserve along Eprapah Creek in Redland City, home to a environmental education centre and walking trails.",
+    "popularity_note": "Locally valued Redland City creek reserve for walking and environmental education."
+  },
+  {
+    "rank": 70,
+    "name": "Currumbin Beachfront Conservation Park",
+    "locality": "Palm Beach, QLD",
+    "lat": -28.103,
+    "lon": 153.45,
+    "category": "conservation_park",
+    "description": "Coastal dune and heath reserve protecting the beachfront between Currumbin and Palm Beach on the Gold Coast.",
+    "popularity_note": "Well-known Gold Coast coastal conservation strip amid a busy tourist beach corridor."
+  },
+  {
+    "rank": 71,
+    "name": "Lake Wivenhoe Outlook / Wivenhoe Park",
+    "locality": "Fernvale, QLD",
+    "lat": -27.383,
+    "lon": 152.617,
+    "category": "regional_park",
+    "description": "Lookout and recreation reserve over Lake Wivenhoe, South East Queensland's largest water supply reservoir.",
+    "popularity_note": "Popular scenic lookout and picnic stop for the Brisbane Valley region."
+  },
+  {
+    "rank": 72,
+    "name": "Sherwood Arboretum",
+    "locality": "Sherwood, QLD",
+    "lat": -27.533,
+    "lon": 152.983,
+    "category": "urban_park",
+    "description": "Riverside parkland on a bend of the Brisbane River featuring a large collection of native and exotic trees.",
+    "popularity_note": "Well-loved heritage arboretum park in Brisbane's south-west."
+  },
+  {
+    "rank": 73,
+    "name": "Mount Glorious Lookout Reserve",
+    "locality": "Mount Glorious, QLD",
+    "lat": -27.33,
+    "lon": 152.766,
+    "category": "regional_park",
+    "description": "Popular scenic lookout in the D'Aguilar Range offering sweeping views back over Brisbane city and Moreton Bay.",
+    "popularity_note": "Well-known Brisbane weekend-drive lookout."
+  },
+  {
+    "rank": 74,
+    "name": "Somerset Dam Recreation Reserve",
+    "locality": "Somerset Dam, QLD",
+    "lat": -27.117,
+    "lon": 152.55,
+    "category": "regional_park",
+    "description": "Foreshore recreation reserve on Lake Somerset in the Brisbane Valley, popular for fishing, camping and picnicking.",
+    "popularity_note": "Well-known Brisbane Valley fishing and camping destination."
+  },
+  {
+    "rank": 75,
+    "name": "Belmont Hills Bushland Reserve",
+    "locality": "Belmont, QLD",
+    "lat": -27.4833,
+    "lon": 153.1167,
+    "category": "regional_park",
+    "description": "Brisbane bushland reserve with a popular purpose-built mountain-bike trail network in the eastern suburbs.",
+    "popularity_note": "One of Brisbane's best-known mountain-biking reserves."
+  },
+  {
+    "rank": 76,
+    "name": "Kedron Brook Linear Park",
+    "locality": "Kedron, QLD",
+    "lat": -27.417,
+    "lon": 153.033,
+    "category": "urban_park",
+    "description": "Long linear parkland corridor following Kedron Brook through Brisbane's northern suburbs, popular for cycling and walking.",
+    "popularity_note": "Well-used Brisbane green corridor connecting several northside suburbs."
+  },
+  {
+    "rank": 77,
+    "name": "Mount Chinghee National Park",
+    "locality": "Mount Chinghee, QLD",
+    "lat": -28.367,
+    "lon": 152.917,
+    "category": "national_park",
+    "description": "Remote Gondwana rainforest wilderness park on the McPherson Range near the NSW border, part of the World Heritage rainforest reserves.",
+    "popularity_note": "Lesser-visited but ecologically significant World Heritage rainforest park."
+  },
+  {
+    "rank": 78,
+    "name": "Southern Moreton Bay Islands National Park",
+    "locality": "Macleay Island, QLD",
+    "lat": -27.683,
+    "lon": 153.367,
+    "category": "national_park",
+    "description": "Scattered reserves across the Southern Moreton Bay Islands (Russell, Macleay, Lamb and Karragarra) protecting coastal bushland.",
+    "popularity_note": "Well-known among the 'SMBI' island communities off Redland City."
+  },
+  {
+    "rank": 79,
+    "name": "Chermside Hills Reserve",
+    "locality": "Chermside, QLD",
+    "lat": -27.382,
+    "lon": 153.03,
+    "category": "regional_park",
+    "description": "Bushland reserve of eucalypt forest in Brisbane's north, with walking tracks and a lookout over the city.",
+    "popularity_note": "Popular northside Brisbane bushwalking reserve."
+  },
+  {
+    "rank": 80,
+    "name": "Gold Creek Reservoir Bushland Reserve",
+    "locality": "Brookfield, QLD",
+    "lat": -27.467,
+    "lon": 152.883,
+    "category": "regional_park",
+    "description": "Bushland surrounding the historic Gold Creek Reservoir in Brisbane's rural west, popular for walking and picnics.",
+    "popularity_note": "Popular western-suburbs Brisbane walking and picnic destination."
+  },
+  {
+    "rank": 81,
+    "name": "Whites Hill Reserve",
+    "locality": "Camp Hill, QLD",
+    "lat": -27.49,
+    "lon": 153.07,
+    "category": "regional_park",
+    "description": "Bushland and grassland reserve in Brisbane's inner south-east with walking tracks, a velodrome and city views.",
+    "popularity_note": "Popular inner-southside Brisbane recreation reserve."
+  },
+  {
+    "rank": 82,
+    "name": "Bowen Park",
+    "locality": "Bowen Hills, QLD",
+    "lat": -27.453,
+    "lon": 153.033,
+    "category": "urban_park",
+    "description": "One of Brisbane's oldest parks, established in 1863, home to the Old Museum building and heritage gardens.",
+    "popularity_note": "Historic inner-Brisbane park of note."
+  },
+  {
+    "rank": 83,
+    "name": "Country Paradise Parklands",
+    "locality": "Nerang, QLD",
+    "lat": -27.997,
+    "lon": 153.339,
+    "category": "regional_park",
+    "description": "Riverside community parklands on the Nerang River hosting markets, an adventure playground and native wildlife.",
+    "popularity_note": "Popular Gold Coast hinterland community park and market venue."
+  },
+  {
+    "rank": 84,
+    "name": "Woody Point Foreshore Park",
+    "locality": "Woody Point, QLD",
+    "lat": -27.267,
+    "lon": 153.1,
+    "category": "urban_park",
+    "description": "Historic bayside parkland on the Redcliffe Peninsula with a jetty, memorial park and Moreton Bay views.",
+    "popularity_note": "Well-loved heritage foreshore park on the Redcliffe Peninsula."
+  },
+  {
+    "rank": 85,
+    "name": "Buderim Forest Park",
+    "locality": "Buderim, QLD",
+    "lat": -26.6833,
+    "lon": 153.05,
+    "category": "regional_park",
+    "description": "Rainforest reserve on the Buderim plateau with short walks to Buderim Falls, a popular Sunshine Coast beauty spot.",
+    "popularity_note": "Well-known Sunshine Coast hinterland waterfall walk, near the outer edge of the search radius."
+  },
+  {
+    "rank": 86,
+    "name": "Redland Bay Foreshore Park",
+    "locality": "Redland Bay, QLD",
+    "lat": -27.633,
+    "lon": 153.3,
+    "category": "urban_park",
+    "description": "Foreshore parkland at Redland Bay with boat ramp access and views across Moreton Bay to the Southern Moreton Bay Islands.",
+    "popularity_note": "Popular local foreshore park and gateway to the Redland Bay island ferries."
+  },
+  {
+    "rank": 87,
+    "name": "Mount Petrie Reserve",
+    "locality": "Mount Petrie, QLD",
+    "lat": -27.533,
+    "lon": 153.133,
+    "category": "regional_park",
+    "description": "Bushland reserve and lookout on Brisbane's south-eastern fringe with walking and mountain-bike trails.",
+    "popularity_note": "Well-used local Brisbane bushland reserve for walkers and mountain bikers."
+  },
+  {
+    "rank": 88,
+    "name": "Davies Park",
+    "locality": "West End, QLD",
+    "lat": -27.477,
+    "lon": 153.007,
+    "category": "urban_park",
+    "description": "Riverside sporting park in West End, home to the popular Davies Park Markets on Saturdays.",
+    "popularity_note": "Well-known inner-city park and weekend market venue."
+  },
+  {
+    "rank": 89,
+    "name": "Nudgee Beach Environmental Reserve",
+    "locality": "Nudgee Beach, QLD",
+    "lat": -27.372,
+    "lon": 153.087,
+    "category": "nature_reserve",
+    "description": "Coastal mangrove and melaleuca reserve on Moreton Bay in Brisbane's north, popular with birdwatchers.",
+    "popularity_note": "Locally valued Moreton Bay foreshore nature reserve."
+  },
+  {
+    "rank": 90,
+    "name": "Yeronga Memorial Park",
+    "locality": "Yeronga, QLD",
+    "lat": -27.5167,
+    "lon": 153.0167,
+    "category": "urban_park",
+    "description": "Riverside sporting and picnic parkland beside the Brisbane River in Brisbane's south.",
+    "popularity_note": "Well-used local riverside park."
+  },
+  {
+    "rank": 91,
+    "name": "Bulimba Riverside Park",
+    "locality": "Bulimba, QLD",
+    "lat": -27.45,
+    "lon": 153.057,
+    "category": "urban_park",
+    "description": "Riverfront parkland in Bulimba with ferry access, popular for picnics and river views opposite Teneriffe.",
+    "popularity_note": "Popular inner-eastern Brisbane riverside park."
+  },
+  {
+    "rank": 92,
+    "name": "Tinchi Tamba Wetlands",
+    "locality": "Bracken Ridge, QLD",
+    "lat": -27.3167,
+    "lon": 153.05,
+    "category": "nature_reserve",
+    "description": "Extensive wetland reserve along the lower Pine River protecting mangroves, saltmarsh and casuarina forest.",
+    "popularity_note": "Well-regarded Brisbane wetland birdwatching destination."
+  },
+  {
+    "rank": 93,
+    "name": "Nerang-Murwillumbah Parklands (Natural Bridge access)",
+    "locality": "Numinbah Valley, QLD",
+    "lat": -28.32,
+    "lon": 153.25,
+    "category": "regional_park",
+    "description": "Treed hinterland parkland at the entrance to Natural Bridge in the Numinbah Valley, Gold Coast hinterland.",
+    "popularity_note": "Gateway reserve for one of the region's most popular short rainforest walks."
+  },
+  {
+    "rank": 94,
+    "name": "Moggill Conservation Park",
+    "locality": "Pullenvale, QLD",
+    "lat": -27.55,
+    "lon": 152.867,
+    "category": "conservation_park",
+    "description": "Dry eucalypt forest reserve in Brisbane's western outskirts with walking trails and habitat for koalas.",
+    "popularity_note": "Locally valued western-Brisbane bushland reserve."
+  },
+  {
+    "rank": 95,
+    "name": "Downfall Creek Bushland Reserve",
+    "locality": "Aspley, QLD",
+    "lat": -27.366,
+    "lon": 153.017,
+    "category": "nature_reserve",
+    "description": "Northside Brisbane bushland reserve with an environmental centre and walking trails along Downfall Creek.",
+    "popularity_note": "Well-regarded local nature reserve and environmental education hub."
+  },
+  {
+    "rank": 96,
+    "name": "Denmark Hill Conservation Park",
+    "locality": "Ipswich, QLD",
+    "lat": -27.6167,
+    "lon": 152.7833,
+    "category": "conservation_park",
+    "description": "Hilltop bushland reserve overlooking Ipswich with remnant vine scrub and city lookout views.",
+    "popularity_note": "Well-known local Ipswich lookout and walking reserve."
+  },
+  {
+    "rank": 97,
+    "name": "Scarborough Beach Reserve",
+    "locality": "Scarborough, QLD",
+    "lat": -27.183,
+    "lon": 153.117,
+    "category": "urban_park",
+    "description": "Elevated foreshore reserve at the northern tip of the Redcliffe Peninsula with views over Moreton Bay and the marina.",
+    "popularity_note": "Popular Redcliffe Peninsula lookout and picnic reserve."
+  },
+  {
+    "rank": 98,
+    "name": "Capalaba Regional Park",
+    "locality": "Capalaba, QLD",
+    "lat": -27.533,
+    "lon": 153.183,
+    "category": "urban_park",
+    "description": "Large multi-purpose sporting and recreation parkland serving the Capalaba and Redland City community.",
+    "popularity_note": "Well-used Redland City community sporting parkland."
+  },
+  {
+    "rank": 99,
+    "name": "Raymond Park",
+    "locality": "Kangaroo Point, QLD",
+    "lat": -27.475,
+    "lon": 153.035,
+    "category": "urban_park",
+    "description": "Riverside park at Kangaroo Point popular for its Brisbane River views and proximity to the CBD ferry terminal.",
+    "popularity_note": "Well-used inner-city riverside park."
+  },
+  {
+    "rank": 100,
+    "name": "Toowong Memorial Park",
+    "locality": "Toowong, QLD",
+    "lat": -27.487,
+    "lon": 152.995,
+    "category": "urban_park",
+    "description": "Historic Brisbane cemetery-parkland with heritage monuments, tree-lined avenues and city views.",
+    "popularity_note": "Notable heritage green space in inner Brisbane."
+  },
+  {
+    "rank": 101,
+    "name": "Mount Ommaney Bushland Reserve",
+    "locality": "Mount Ommaney, QLD",
+    "lat": -27.55,
+    "lon": 152.933,
+    "category": "nature_reserve",
+    "description": "Riverside bushland reserve on the Brisbane River in Brisbane's western suburbs, with walking trails and picnic areas.",
+    "popularity_note": "Popular western-suburbs Brisbane walking reserve."
+  },
+  {
+    "rank": 102,
+    "name": "Gap Creek Reserve",
+    "locality": "The Gap, QLD",
+    "lat": -27.44,
+    "lon": 152.95,
+    "category": "nature_reserve",
+    "description": "Creekside bushland reserve on Brisbane's western edge adjoining D'Aguilar National Park.",
+    "popularity_note": "Well-used local reserve providing access to the wider D'Aguilar Range."
+  },
+  {
+    "rank": 103,
+    "name": "Bigriggen Park",
+    "locality": "Beaudesert, QLD",
+    "lat": -27.9833,
+    "lon": 152.9967,
+    "category": "regional_park",
+    "description": "Riverside recreation reserve on the Logan River at Beaudesert with picnic areas and a koala habitat corridor.",
+    "popularity_note": "Well-used local recreation park for the Beaudesert community."
+  },
+  {
+    "rank": 104,
+    "name": "Deception Bay Foreshore Park",
+    "locality": "Deception Bay, QLD",
+    "lat": -27.183,
+    "lon": 153.033,
+    "category": "urban_park",
+    "description": "Bayside esplanade parkland along Deception Bay with picnic areas and views across Moreton Bay.",
+    "popularity_note": "Popular local foreshore park in the City of Moreton Bay."
+  },
+  {
+    "rank": 105,
+    "name": "Point Halloran Conservation Area",
+    "locality": "Redland Bay, QLD",
+    "lat": -27.633,
+    "lon": 153.283,
+    "category": "conservation_park",
+    "description": "Coastal bushland and mangrove reserve overlooking Moreton Bay near Redland Bay.",
+    "popularity_note": "Locally valued Redland City coastal conservation reserve."
+  },
+  {
+    "rank": 106,
+    "name": "Mowbray Park",
+    "locality": "East Brisbane, QLD",
+    "lat": -27.478,
+    "lon": 153.043,
+    "category": "urban_park",
+    "description": "Riverside sporting and picnic park in East Brisbane with river frontage and heritage rotunda.",
+    "popularity_note": "Locally popular inner-Brisbane riverside park."
+  },
+  {
+    "rank": 107,
+    "name": "North Lakes Recreational Parklands",
+    "locality": "North Lakes, QLD",
+    "lat": -27.233,
+    "lon": 153.067,
+    "category": "urban_park",
+    "description": "Landscaped lakeside parklands serving the master-planned North Lakes community in Moreton Bay Region.",
+    "popularity_note": "Well-used contemporary suburban parkland north of Brisbane."
+  },
+  {
+    "rank": 108,
+    "name": "Dayboro Park",
+    "locality": "Dayboro, QLD",
+    "lat": -27.19,
+    "lon": 152.8,
+    "category": "urban_park",
+    "description": "Township park in the historic rural village of Dayboro at the foot of the D'Aguilar Range.",
+    "popularity_note": "Popular local park for the Dayboro/Samford hinterland community."
+  },
+  {
+    "rank": 109,
+    "name": "Caboolture River Regional Park",
+    "locality": "Caboolture, QLD",
+    "lat": -27.083,
+    "lon": 152.95,
+    "category": "regional_park",
+    "description": "Riverside parkland along the Caboolture River offering walking trails, picnic areas and wetland habitat.",
+    "popularity_note": "Locally significant regional park serving the Caboolture community."
+  }
+]
