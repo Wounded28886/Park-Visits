@@ -61,6 +61,13 @@ const DEFAULT_TILE_ATTRIBUTION =
   '&copy; <a href="https://carto.com/attributions">CARTO</a>';
 
 class ParkVisitsMapCard extends HTMLElement {
+  constructor() {
+    super();
+    // entity_id -> { marker: L.Marker, signature: string }
+    this._markers = new Map();
+    this._fitDone = false;
+  }
+
   setConfig(config) {
     this.config = {
       title: "Parks",
@@ -69,13 +76,33 @@ class ParkVisitsMapCard extends HTMLElement {
       default_zoom: 8,
       ...config,
     };
-    // entity_id -> { marker: L.Marker, signature: string }
-    this._markers = new Map();
+    // A re-config after the map exists must drop the old markers off the
+    // map, not just forget about them, or they'd linger as orphans.
+    if (this._map) {
+      for (const { marker } of this._markers.values()) marker.remove();
+    }
+    this._markers.clear();
     this._fitDone = false;
+    if (this.isConnected) this._buildCard();
   }
 
   connectedCallback() {
+    // Home Assistant may assign .hass before the browser has upgraded this
+    // element to its class. Such an assignment creates a plain own data
+    // property that permanently shadows the prototype's `set hass()`, so
+    // every later update writes to that dead property and the card never
+    // re-renders — the map builds but stays empty. Re-apply any
+    // pre-upgrade value through the real accessor.
+    this._upgradeProperty("hass");
     this._buildCard();
+  }
+
+  _upgradeProperty(prop) {
+    if (Object.prototype.hasOwnProperty.call(this, prop)) {
+      const value = this[prop];
+      delete this[prop];
+      this[prop] = value;
+    }
   }
 
   disconnectedCallback() {
@@ -89,7 +116,9 @@ class ParkVisitsMapCard extends HTMLElement {
   }
 
   async _buildCard() {
-    if (this._built) return;
+    // setConfig and connectedCallback can arrive in either order; build
+    // only once, and only once we actually have a config to build from.
+    if (this._built || !this.config) return;
     this._built = true;
 
     this.innerHTML = `

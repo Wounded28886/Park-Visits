@@ -39,6 +39,10 @@ views:
     path: list
     icon: mdi:format-list-bulleted
     cards:
+      # Distance is the geo_location entity's STATE, not an attribute —
+      # reading p.attributes.distance raises UndefinedError and blanks the
+      # whole card. Attributes are read with .get() for the same reason:
+      # one missing key would otherwise take out the entire table.
       - type: markdown
         title: Top parks by rating
         content: >
@@ -53,5 +57,5 @@ views:
           | # | Park | Rating | Categories | Distance | Your rating |
           |---|------|--------|------------|----------|--------------|
           {% for p in parks -%}
-          | {{ p.attributes.rank }} | {{ p.name }} | {{ '%.1f' | format(p.attributes.rating | float(0)) if p.attributes.rating is not none else '—' }} ({{ p.attributes.rating_count or 0 }}) | {{ (p.attributes.categories or []) | join(', ') }} | {{ '%.1f' | format(p.attributes.distance | float(0)) }} km | {{ p.attributes.our_rating ~ '/10' if p.attributes.our_rating is not none else '—' }} |
+          | {{ p.attributes.get('rank', '—') }} | {{ p.name }} | {% if p.attributes.get('rating') is not none %}{{ '%.1f' | format(p.attributes.get('rating') | float(0)) }} ({{ p.attributes.get('rating_count', 0) }}){% else %}—{% endif %} | {{ (p.attributes.get('categories') or []) | join(', ') }} | {{ '%.1f' | format(p.state | float(0)) }} km | {% if p.attributes.get('our_rating') is not none %}{{ p.attributes.get('our_rating') }}/10{% else %}—{% endif %} |
           {% endfor %}
