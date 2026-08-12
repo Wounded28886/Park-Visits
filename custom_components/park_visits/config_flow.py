@@ -8,11 +8,6 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE
 from homeassistant.core import callback
-from homeassistant.helpers.selector import (
-    NumberSelector,
-    NumberSelectorConfig,
-    NumberSelectorMode,
-)
 
 from .const import (
     CONF_MAX_PARKS,
@@ -33,21 +28,13 @@ from .const import (
 def _schema(defaults: dict[str, Any]) -> vol.Schema:
     return vol.Schema(
         {
-            vol.Required(CONF_LATITUDE, default=defaults[CONF_LATITUDE]): NumberSelector(
-                NumberSelectorConfig(min=-90, max=90, step=0.0001, mode=NumberSelectorMode.BOX)
+            vol.Required(CONF_LATITUDE, default=defaults[CONF_LATITUDE]): vol.Coerce(float),
+            vol.Required(CONF_LONGITUDE, default=defaults[CONF_LONGITUDE]): vol.Coerce(float),
+            vol.Required(CONF_RADIUS_KM, default=defaults[CONF_RADIUS_KM]): vol.All(
+                vol.Coerce(float), vol.Range(min=MIN_RADIUS_KM, max=MAX_RADIUS_KM)
             ),
-            vol.Required(CONF_LONGITUDE, default=defaults[CONF_LONGITUDE]): NumberSelector(
-                NumberSelectorConfig(min=-180, max=180, step=0.0001, mode=NumberSelectorMode.BOX)
-            ),
-            vol.Required(CONF_RADIUS_KM, default=defaults[CONF_RADIUS_KM]): NumberSelector(
-                NumberSelectorConfig(
-                    min=MIN_RADIUS_KM, max=MAX_RADIUS_KM, step=1, mode=NumberSelectorMode.BOX
-                )
-            ),
-            vol.Required(CONF_MAX_PARKS, default=defaults[CONF_MAX_PARKS]): NumberSelector(
-                NumberSelectorConfig(
-                    min=MIN_MAX_PARKS, max=MAX_MAX_PARKS, step=1, mode=NumberSelectorMode.BOX
-                )
+            vol.Required(CONF_MAX_PARKS, default=defaults[CONF_MAX_PARKS]): vol.All(
+                vol.Coerce(int), vol.Range(min=MIN_MAX_PARKS, max=MAX_MAX_PARKS)
             ),
         }
     )
