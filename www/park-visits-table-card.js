@@ -142,7 +142,45 @@ class ParkVisitsTableCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     this._renderRows();
-    if (this._openEntity) this._renderDialog();
+    if (this._openEntity) this._maybeRerenderDialog();
+  }
+
+  /**
+   * Everything the open dialog actually displays.
+   *
+   * Home Assistant assigns .hass on *every* state change anywhere in the
+   * system — dozens of times a minute on a busy instance — and the dialog is
+   * rendered by replacing innerHTML. Redrawing on each of those pushes reset
+   * the scroll position and destroyed anything typed into the review form,
+   * so a redraw now only happens when one of these values has changed.
+   */
+  _dialogSignature() {
+    const state = this._hass && this._hass.states[this._openEntity];
+    if (!state) return "missing";
+    const a = state.attributes;
+    return [
+      state.last_updated,
+      a.friendly_name,
+      a.our_rating,
+      a.our_liked,
+      a.our_disliked,
+      a.our_note,
+      a.our_photo_count,
+      a.our_reviewed_at,
+      this._details ? "details" : "nodetails",
+      this._detailsError ? "err" : "ok",
+      (this._googlePhotoUrls || []).length,
+      (this._ourPhotoUrls || []).length,
+      this._formOpen ? "form" : "noform",
+    ].join("|");
+  }
+
+  _maybeRerenderDialog() {
+    // Never redraw underneath someone who is mid-review: even a "relevant"
+    // change isn't worth discarding half-written text.
+    if (this._formOpen) return;
+    if (this._dialogSignature() === this._renderedSignature) return;
+    this._renderDialog();
   }
 
   /* ---------------------------------------------------------------- build */
@@ -350,6 +388,7 @@ class ParkVisitsTableCard extends HTMLElement {
     this._googlePhotoUrls = [];
     this._ourPhotoUrls = [];
     this._formOpen = false;
+    this._renderedSignature = null;
     this.querySelector(".pv-dialog-root").innerHTML = "";
   }
 
@@ -358,13 +397,19 @@ class ParkVisitsTableCard extends HTMLElement {
     if (!root) return;
     if (!this._openEntity) {
       root.innerHTML = "";
+      this._renderedSignature = null;
       return;
     }
     const state = this._hass.states[this._openEntity];
     if (!state) {
       root.innerHTML = "";
+      this._renderedSignature = null;
       return;
     }
+    // The backdrop is the scroll container; a redraw would otherwise jump the
+    // reader back to the top of a long park page.
+    const previousBackdrop = root.querySelector(".pv-backdrop");
+    const previousScroll = previousBackdrop ? previousBackdrop.scrollTop : 0;
     const a = state.attributes;
     const d = this._details;
 
@@ -488,6 +533,10 @@ class ParkVisitsTableCard extends HTMLElement {
         </div>
       </div>
     `;
+
+    const backdrop = root.querySelector(".pv-backdrop");
+    if (backdrop && previousScroll) backdrop.scrollTop = previousScroll;
+    this._renderedSignature = this._dialogSignature();
 
     // A signed photo URL can still 404 (e.g. Google details fell out of the
     // server-side cache), which would otherwise leave an empty grey tile.
