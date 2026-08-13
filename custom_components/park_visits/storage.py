@@ -18,7 +18,12 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
-from .const import PARKS_CACHE_KEY_TEMPLATE, STORAGE_KEY_TEMPLATE, STORAGE_VERSION
+from .const import (
+    PARKS_CACHE_KEY_TEMPLATE,
+    PLAN_KEY_TEMPLATE,
+    STORAGE_KEY_TEMPLATE,
+    STORAGE_VERSION,
+)
 
 
 @dataclass
@@ -154,6 +159,42 @@ class ParkReviewStore:
         await self._store.async_save(
             {place_id: asdict(r) for place_id, r in self._reviews.items()}
         )
+
+
+class ParkPlanStore:
+    """Remembers which park we've decided to visit next.
+
+    Kept apart from the review store: it's a single pointer rather than a
+    per-park record, and it changes on a different rhythm.
+    """
+
+    def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
+        self._store: Store = Store(
+            hass, STORAGE_VERSION, PLAN_KEY_TEMPLATE.format(entry_id=entry_id)
+        )
+        self._next: dict[str, Any] | None = None
+
+    async def async_load(self) -> None:
+        raw = await self._store.async_load()
+        if raw and raw.get("place_id"):
+            self._next = raw
+
+    @property
+    def next_park(self) -> dict[str, Any] | None:
+        """{'place_id', 'park_name', 'set_at'} for the planned park, if any."""
+        return dict(self._next) if self._next else None
+
+    async def async_set_next(self, place_id: str, park_name: str = "") -> None:
+        self._next = {
+            "place_id": place_id,
+            "park_name": park_name,
+            "set_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await self._store.async_save(self._next)
+
+    async def async_clear_next(self) -> None:
+        self._next = None
+        await self._store.async_save({})
 
 
 class ParkListCache:

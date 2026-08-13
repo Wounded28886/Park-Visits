@@ -56,6 +56,23 @@ delete_review:
       selector:
         text:
 
+set_next_park:
+  name: Set the next park to visit
+  description: >-
+    Mark a park as the one we plan to visit next. Reviewing that park clears
+    the assignment automatically, since by then we've been.
+  fields:
+    place_id:
+      name: Park
+      description: The Google place_id of the park.
+      required: true
+      selector:
+        text:
+
+clear_next_park:
+  name: Clear the next park
+  description: Forget which park we planned to visit next.
+
 delete_photo:
   name: Delete a review photo
   description: Remove a single photo from a park's review and delete the file.

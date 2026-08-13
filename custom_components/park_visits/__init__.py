@@ -24,12 +24,14 @@ from .const import (
     SERVICE_ATTR_NOTE,
     SERVICE_ATTR_PLACE_ID,
     SERVICE_ATTR_RATING,
+    SERVICE_CLEAR_NEXT_PARK,
     SERVICE_DELETE_PHOTO,
     SERVICE_DELETE_REVIEW,
     SERVICE_RATE_PARK,
+    SERVICE_SET_NEXT_PARK,
 )
 from .coordinator import ParkVisitsCoordinator
-from .storage import ParkListCache, ParkReviewStore
+from .storage import ParkListCache, ParkPlanStore, ParkReviewStore
 from .views import async_delete_photo_files, async_register_views
 
 PLATFORMS = ["geo_location", "sensor", "button"]
@@ -48,6 +50,10 @@ RATE_PARK_SCHEMA = vol.Schema(
 
 DELETE_REVIEW_SCHEMA = vol.Schema({vol.Required(SERVICE_ATTR_PLACE_ID): cv.string})
 
+SET_NEXT_PARK_SCHEMA = vol.Schema({vol.Required(SERVICE_ATTR_PLACE_ID): cv.string})
+
+CLEAR_NEXT_PARK_SCHEMA = vol.Schema({})
+
 DELETE_PHOTO_SCHEMA = vol.Schema(
     {
         vol.Required(SERVICE_ATTR_PLACE_ID): cv.string,
@@ -62,7 +68,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await reviews.async_load()
 
     park_cache = ParkListCache(hass, entry.entry_id)
-    coordinator = ParkVisitsCoordinator(hass, entry, reviews, park_cache)
+    plan = ParkPlanStore(hass, entry.entry_id)
+    await plan.async_load()
+    coordinator = ParkVisitsCoordinator(hass, entry, reviews, park_cache, plan)
 
     # Restoring the previous park list keeps a restart free: Google is only
     # contacted when there's nothing cached for the current settings (first
@@ -101,6 +109,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         filenames = await coordinator.async_delete_review(place_id)
         await async_delete_photo_files(hass, place_id, filenames)
 
+    async def _async_handle_set_next_park(call: ServiceCall) -> None:
+        place_id = call.data[SERVICE_ATTR_PLACE_ID]
+        known_ids = {park.place_id for park in coordinator.data} if coordinator.data else set()
+        if place_id not in known_ids:
+            raise HomeAssistantError(
+                f"Unknown park place_id '{place_id}' — it isn't in the current tracked list"
+            )
+        await coordinator.async_set_next_park(place_id)
+
+    async def _async_handle_clear_next_park(call: ServiceCall) -> None:
+        await coordinator.async_clear_next_park()
+
     async def _async_handle_delete_photo(call: ServiceCall) -> None:
         place_id = call.data[SERVICE_ATTR_PLACE_ID]
         filename = call.data[SERVICE_ATTR_FILENAME]
@@ -122,6 +142,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_DELETE_PHOTO,
             _async_handle_delete_photo,
             schema=DELETE_PHOTO_SCHEMA,
+        )
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_NEXT_PARK,
+            _async_handle_set_next_park,
+            schema=SET_NEXT_PARK_SCHEMA,
+        )
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_CLEAR_NEXT_PARK,
+            _async_handle_clear_next_park,
+            schema=CLEAR_NEXT_PARK_SCHEMA,
         )
 
     # Views are global rather than per-entry, and HA raises if the same view
@@ -151,4 +183,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.services.async_remove(DOMAIN, SERVICE_RATE_PARK)
             hass.services.async_remove(DOMAIN, SERVICE_DELETE_REVIEW)
             hass.services.async_remove(DOMAIN, SERVICE_DELETE_PHOTO)
+            hass.services.async_remove(DOMAIN, SERVICE_SET_NEXT_PARK)
+            hass.services.async_remove(DOMAIN, SERVICE_CLEAR_NEXT_PARK)
     return unload_ok

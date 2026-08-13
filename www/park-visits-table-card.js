@@ -151,7 +151,188 @@ class ParkVisitsTableCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     this._renderRows();
+    this._renderStatusStrip();
     if (this._openEntity) this._maybeRerenderDialog();
+  }
+
+  /* -------------------------------------------------- last visited / next */
+
+  /**
+   * Find one of our summary sensors by its role attribute.
+   *
+   * Entity ids get suffixed when there are name clashes and users rename
+   * them, so matching on a marker attribute is more durable than hardcoding
+   * sensor.next_park.
+   */
+  _sensorByRole(role) {
+    if (!this._hass) return null;
+    return (
+      Object.values(this._hass.states).find(
+        (s) => s.attributes && s.attributes.park_visits_role === role
+      ) || null
+    );
+  }
+
+  _renderStatusStrip() {
+    const strip = this.querySelector(".pv-status-strip");
+    if (!strip || !this._hass) return;
+
+    const next = this._sensorByRole("next_park");
+    const last = this._sensorByRole("last_visited");
+    // Nothing to show if the integration predates these sensors.
+    if (!next && !last) {
+      strip.innerHTML = "";
+      return;
+    }
+
+    const signature = JSON.stringify([
+      next && [next.state, next.attributes.place_id, next.attributes.distance_km],
+      last && [last.state, last.attributes.place_id, last.attributes.reviewed_at],
+      this._pickerOpen,
+    ]);
+    if (signature === this._stripSignature) return;
+    this._stripSignature = signature;
+
+    const hasNext = next && next.attributes.place_id;
+    const hasLast = last && last.attributes.place_id;
+
+    const lastBody = hasLast
+      ? `<div class="pv-strip-name">${escapeHtml(last.state)}</div>
+         <div class="pv-strip-sub">${
+           last.attributes.our_rating != null
+             ? `We rated it ${escapeHtml(last.attributes.our_rating)}/10`
+             : "Not rated"
+         }${
+          last.attributes.reviewed_at
+            ? ` · ${escapeHtml(new Date(last.attributes.reviewed_at).toLocaleDateString())}`
+            : ""
+        }</div>`
+      : `<div class="pv-strip-empty">No visits recorded yet — review a park to log one.</div>`;
+
+    const nextBody = hasNext
+      ? `<div class="pv-strip-name">${escapeHtml(next.state)}</div>
+         <div class="pv-strip-sub">${
+           next.attributes.rating != null
+             ? `★ ${Number(next.attributes.rating).toFixed(1)}`
+             : "No Google rating"
+         }${
+          next.attributes.distance_km != null
+            ? ` · ${Number(next.attributes.distance_km).toFixed(1)} km away`
+            : ""
+        }</div>`
+      : `<div class="pv-strip-empty">Nothing planned yet.</div>`;
+
+    strip.innerHTML = `
+      <div class="pv-strip">
+        <div class="pv-strip-box">
+          <div class="pv-strip-label">🕘 Last visited</div>
+          ${lastBody}
+          ${
+            hasLast
+              ? `<div class="pv-strip-actions">
+                   <button class="pv-strip-btn pv-open-last" data-place="${escapeHtml(
+                     last.attributes.place_id
+                   )}">View</button>
+                 </div>`
+              : ""
+          }
+        </div>
+        <div class="pv-strip-box pv-strip-next">
+          <div class="pv-strip-label">📍 Next up</div>
+          ${nextBody}
+          <div class="pv-strip-actions">
+            <button class="pv-strip-btn pv-pick-next">${
+              hasNext ? "Change" : "Choose a park"
+            }</button>
+            ${
+              hasNext
+                ? `<button class="pv-strip-btn pv-open-next" data-place="${escapeHtml(
+                    next.attributes.place_id
+                  )}">View</button>
+                   <button class="pv-strip-btn pv-clear-next">Clear</button>`
+                : ""
+            }
+          </div>
+          ${this._pickerOpen ? this._pickerHtml() : ""}
+        </div>
+      </div>`;
+
+    this._wireStatusStrip(strip);
+  }
+
+  _pickerHtml() {
+    const parks = Object.values(this._hass.states)
+      .filter((s) => s.attributes.source === this.config.source)
+      .sort((a, b) => (a.attributes.rank || 0) - (b.attributes.rank || 0));
+    return `
+      <div class="pv-picker">
+        <select class="pv-picker-select">
+          <option value="">— pick a park —</option>
+          ${parks
+            .map(
+              (s) =>
+                `<option value="${escapeHtml(s.attributes.place_id)}">#${
+                  s.attributes.rank
+                } ${escapeHtml(s.attributes.friendly_name)} (${
+                  Number.isNaN(parseFloat(s.state))
+                    ? "?"
+                    : parseFloat(s.state).toFixed(0)
+                } km)</option>`
+            )
+            .join("")}
+        </select>
+        <span class="pv-picker-status"></span>
+      </div>`;
+  }
+
+  _wireStatusStrip(strip) {
+    const openPark = (placeId) => {
+      const match = Object.values(this._hass.states).find(
+        (s) => s.attributes.source === this.config.source && s.attributes.place_id === placeId
+      );
+      if (match) this._openPark(match.entity_id);
+    };
+
+    const last = strip.querySelector(".pv-open-last");
+    if (last) last.addEventListener("click", () => openPark(last.dataset.place));
+    const nextView = strip.querySelector(".pv-open-next");
+    if (nextView) nextView.addEventListener("click", () => openPark(nextView.dataset.place));
+
+    const pick = strip.querySelector(".pv-pick-next");
+    if (pick) {
+      pick.addEventListener("click", () => {
+        this._pickerOpen = !this._pickerOpen;
+        this._stripSignature = null;
+        this._renderStatusStrip();
+      });
+    }
+
+    const clear = strip.querySelector(".pv-clear-next");
+    if (clear) {
+      clear.addEventListener("click", async () => {
+        await this._hass.callService("park_visits", "clear_next_park", {});
+        this._stripSignature = null;
+      });
+    }
+
+    const select = strip.querySelector(".pv-picker-select");
+    if (select) {
+      select.addEventListener("change", async () => {
+        if (!select.value) return;
+        const status = strip.querySelector(".pv-picker-status");
+        status.textContent = "Saving…";
+        try {
+          await this._hass.callService("park_visits", "set_next_park", {
+            place_id: select.value,
+          });
+          this._pickerOpen = false;
+          this._stripSignature = null;
+          this._renderStatusStrip();
+        } catch (err) {
+          status.textContent = `Couldn't set: ${err && err.message ? err.message : err}`;
+        }
+      });
+    }
   }
 
   /**
@@ -182,6 +363,8 @@ class ParkVisitsTableCard extends HTMLElement {
       (this._ourPhotoUrls || []).length,
       this._formOpen ? "form" : "noform",
       this._pendingReview ? JSON.stringify(this._pendingReview) : "-",
+      // So the "Set as next visit" button reflects the current selection.
+      this._isNextPark(a.place_id) ? "next" : "notnext",
     ].join("|");
   }
 
@@ -220,6 +403,11 @@ class ParkVisitsTableCard extends HTMLElement {
       : { ...a, ...pending.values };
   }
 
+  _isNextPark(placeId) {
+    const next = this._sensorByRole("next_park");
+    return !!(placeId && next && next.attributes.place_id === placeId);
+  }
+
   _maybeRerenderDialog() {
     // Never redraw underneath someone who is mid-review: even a "relevant"
     // change isn't worth discarding half-written text.
@@ -237,6 +425,7 @@ class ParkVisitsTableCard extends HTMLElement {
     this.innerHTML = `
       <ha-card header="${escapeHtml(this.config.title)}">
         <div class="card-content">
+          <div class="pv-status-strip"></div>
           ${
             this.config.show_filter
               ? `<input class="pv-filter" type="search" placeholder="Filter parks…" />`
@@ -289,6 +478,7 @@ class ParkVisitsTableCard extends HTMLElement {
     });
 
     this._renderRows();
+    this._renderStatusStrip();
   }
 
   /* --------------------------------------------------------------- table */
@@ -564,6 +754,9 @@ class ParkVisitsTableCard extends HTMLElement {
               <button class="pv-btn pv-write">${
                 hasOurReview ? "Edit our review" : "Write a review"
               }</button>
+              <button class="pv-btn pv-secondary pv-set-next">${
+                this._isNextPark(a.place_id) ? "✓ Next up" : "Set as next visit"
+              }</button>
             </div>
 
             <h3>Our review</h3>
@@ -626,6 +819,26 @@ class ParkVisitsTableCard extends HTMLElement {
       write.addEventListener("click", () => {
         this._formOpen = true;
         this._renderDialog();
+      });
+    }
+
+    const setNext = root.querySelector(".pv-set-next");
+    if (setNext) {
+      setNext.addEventListener("click", async () => {
+        const alreadyNext = this._isNextPark(a.place_id);
+        setNext.disabled = true;
+        try {
+          await this._hass.callService(
+            "park_visits",
+            alreadyNext ? "clear_next_park" : "set_next_park",
+            alreadyNext ? {} : { place_id: a.place_id }
+          );
+          this._stripSignature = null;
+          this._renderedSignature = null;
+          this._renderDialog();
+        } catch (err) {
+          setNext.disabled = false;
+        }
       });
     }
 
@@ -837,6 +1050,36 @@ class ParkVisitsTableCard extends HTMLElement {
 
 const STYLES = `
 <style>
+  .pv-strip { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .pv-strip-box {
+    flex: 1 1 240px; padding: 10px 12px; border-radius: 10px;
+    background: var(--secondary-background-color, #222);
+    border: 1px solid var(--divider-color, #333);
+  }
+  .pv-strip-next { border-color: var(--primary-color, #03a9f4); }
+  .pv-strip-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    opacity: 0.7; margin-bottom: 4px;
+  }
+  .pv-strip-name { font-size: 16px; font-weight: 600; }
+  .pv-strip-sub { font-size: 12px; opacity: 0.75; margin-top: 2px; }
+  .pv-strip-empty { font-size: 13px; opacity: 0.6; }
+  .pv-strip-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .pv-strip-btn {
+    padding: 3px 10px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px;
+    border: 1px solid var(--divider-color, #444);
+    background: transparent; color: var(--primary-text-color, #eee);
+  }
+  .pv-strip-btn:hover {
+    border-color: var(--primary-color, #03a9f4); color: var(--primary-color, #03a9f4);
+  }
+  .pv-picker { margin-top: 8px; display: flex; gap: 8px; align-items: center; }
+  .pv-picker-select {
+    flex: 1; padding: 5px; border-radius: 6px; font: inherit;
+    border: 1px solid var(--divider-color, #333);
+    background: var(--primary-background-color, #111); color: var(--primary-text-color, #eee);
+  }
+  .pv-picker-status { font-size: 12px; opacity: 0.75; }
   .pv-scroll { overflow-x: auto; }
   .pv-table { width: 100%; border-collapse: collapse; font-size: 14px; }
   .pv-table th, .pv-table td {
