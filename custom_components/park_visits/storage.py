@@ -18,7 +18,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
-from .const import STORAGE_KEY_TEMPLATE, STORAGE_VERSION
+from .const import PARKS_CACHE_KEY_TEMPLATE, STORAGE_KEY_TEMPLATE, STORAGE_VERSION
 
 
 @dataclass
@@ -130,3 +130,30 @@ class ParkReviewStore:
         await self._store.async_save(
             {place_id: asdict(r) for place_id, r in self._reviews.items()}
         )
+
+
+class ParkListCache:
+    """Persists the last fetched park list so a restart costs no API quota.
+
+    Without this, Home Assistant's normal "refresh on setup" behaviour would
+    spend a full (paid) tiled Google search every time it restarts, which
+    defeats the point of the manual refresh button. The search parameters are
+    stored alongside the data: if the centre point, radius or park count has
+    changed, the cache is treated as stale and a real fetch happens instead.
+    """
+
+    def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
+        self._store: Store = Store(
+            hass, STORAGE_VERSION, PARKS_CACHE_KEY_TEMPLATE.format(entry_id=entry_id)
+        )
+
+    async def async_load(self, fingerprint: str) -> list[dict[str, Any]] | None:
+        """Return cached parks if they were fetched with these same settings."""
+        raw = await self._store.async_load()
+        if not raw or raw.get("fingerprint") != fingerprint:
+            return None
+        parks = raw.get("parks")
+        return parks if isinstance(parks, list) and parks else None
+
+    async def async_save(self, fingerprint: str, parks: list[dict[str, Any]]) -> None:
+        await self._store.async_save({"fingerprint": fingerprint, "parks": parks})

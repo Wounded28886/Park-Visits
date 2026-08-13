@@ -119,10 +119,17 @@ There is **no automatic polling**. Google is contacted only when:
 
 | Action | Cost |
 |---|---|
-| Adding the integration, or changing its options | One full park search |
+| Adding the integration for the first time | One full park search |
+| Changing centre point, radius or park count | One full park search |
 | Pressing **Refresh parks** | One full park search |
 | Opening a park for the first time in 24h | One Place Details call |
 | Viewing a park's Google photos | One photo fetch each |
+| **Restarting Home Assistant** | **Nothing** — the park list is restored from disk |
+
+That last row matters: Home Assistant normally refreshes an integration's
+data on every startup, which here would mean a paid search each restart. The
+fetched list is cached to `.storage` and restored instead, keyed by the
+search settings so it's correctly discarded when you change them.
 
 A full park search tiles the configured radius into overlapping 50km-radius
 Nearby Search requests (Google's per-request cap), so cost scales with
