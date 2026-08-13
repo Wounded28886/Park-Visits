@@ -39,6 +39,9 @@ ATTR_OUR_REVIEWED_AT = "our_reviewed_at"
 
 # park_visits.rate_park service
 SERVICE_RATE_PARK = "rate_park"
+SERVICE_DELETE_REVIEW = "delete_review"
+SERVICE_DELETE_PHOTO = "delete_photo"
+SERVICE_ATTR_FILENAME = "filename"
 SERVICE_ATTR_PLACE_ID = "place_id"
 SERVICE_ATTR_RATING = "rating"
 SERVICE_ATTR_NOTE = "note"

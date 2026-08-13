@@ -59,6 +59,48 @@ def photo_dir(hass: HomeAssistant, place_id: str) -> str:
     return hass.config.path(PHOTO_DIR_NAME, place_id)
 
 
+def is_safe_photo_target(place_id: str, filename: str) -> bool:
+    """Whether these came from us and can't escape the photo directory."""
+    return bool(_PLACE_ID_RE.match(place_id) and _FILENAME_RE.match(filename))
+
+
+async def async_delete_photo_files(
+    hass: HomeAssistant, place_id: str, filenames: list[str]
+) -> int:
+    """Delete photo files from disk, returning how many were removed.
+
+    Missing files are not an error — the point is that they end up gone.
+    """
+    if not _PLACE_ID_RE.match(place_id):
+        return 0
+    directory = photo_dir(hass, place_id)
+
+    def _delete() -> int:
+        removed = 0
+        for filename in filenames:
+            if not _FILENAME_RE.match(filename):
+                continue
+            path = os.path.join(directory, filename)
+            if not os.path.realpath(path).startswith(os.path.realpath(directory) + os.sep):
+                continue
+            try:
+                os.remove(path)
+                removed += 1
+            except FileNotFoundError:
+                pass
+            except OSError as err:
+                _LOGGER.warning("Could not delete photo %s: %s", path, err)
+        # Tidy up the park's folder once it holds nothing.
+        try:
+            if os.path.isdir(directory) and not os.listdir(directory):
+                os.rmdir(directory)
+        except OSError:
+            pass
+        return removed
+
+    return await hass.async_add_executor_job(_delete)
+
+
 def _entry_data(hass: HomeAssistant) -> dict[str, Any] | None:
     """Runtime data for the (single) config entry, if the integration is loaded."""
     for value in hass.data.get(DOMAIN, {}).values():
@@ -347,10 +389,60 @@ class UploadPhotoView(HomeAssistantView):
                 handle.write(b"".join(chunks))
 
         await self.hass.async_add_executor_job(_write)
-        await data["reviews"].async_add_photo(place_id, filename)
-        await data["coordinator"].async_refresh_reviews()
+
+        coordinator = data["coordinator"]
+        park_name = ""
+        if coordinator.data:
+            park_name = next(
+                (p.name for p in coordinator.data if p.place_id == place_id), ""
+            )
+        await data["reviews"].async_add_photo(place_id, filename, park_name=park_name)
+        await coordinator.async_refresh_reviews()
 
         return self.json({"filename": filename})
+
+
+class GalleryView(HomeAssistantView):
+    """Every review that has photos, for the gallery card."""
+
+    url = "/api/park_visits/gallery"
+    name = "api:park_visits:gallery"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+
+    async def get(self, request: web.Request) -> web.Response:
+        data = _entry_data(self.hass)
+        if not data:
+            return self.json_message("Park Visits is not configured", 503)
+
+        # Prefer the live park name; fall back to the one saved with the
+        # review, which is all we have once a park leaves the tracked list.
+        live_names = {}
+        coordinator = data["coordinator"]
+        if coordinator.data:
+            live_names = {p.place_id: p.name for p in coordinator.data}
+
+        items = []
+        for place_id, review in data["reviews"].all_reviews().items():
+            if not review.photos:
+                continue
+            items.append(
+                {
+                    "place_id": place_id,
+                    "name": live_names.get(place_id) or review.park_name or "Unknown park",
+                    "rating": review.rating if review.reviewed_at else None,
+                    "liked": review.liked,
+                    "disliked": review.disliked,
+                    "note": review.note,
+                    "reviewed_at": review.reviewed_at or None,
+                    "photos": list(review.photos),
+                    "still_tracked": place_id in live_names,
+                }
+            )
+        items.sort(key=lambda i: i["reviewed_at"] or "", reverse=True)
+        return self.json({"parks": items})
 
 
 def async_register_views(hass: HomeAssistant) -> None:
@@ -360,3 +452,4 @@ def async_register_views(hass: HomeAssistant) -> None:
     hass.http.register_view(GooglePhotoView(hass, cache))
     hass.http.register_view(OurPhotoView(hass))
     hass.http.register_view(UploadPhotoView(hass))
+    hass.http.register_view(GalleryView(hass))

@@ -42,3 +42,33 @@ rate_park:
       selector:
         text:
           multiline: true
+
+delete_review:
+  name: Delete a review
+  description: >-
+    Remove our review for a park, including every photo uploaded with it.
+    The photo files are deleted from disk. This cannot be undone.
+  fields:
+    place_id:
+      name: Park
+      description: The Google place_id of the park.
+      required: true
+      selector:
+        text:
+
+delete_photo:
+  name: Delete a review photo
+  description: Remove a single photo from a park's review and delete the file.
+  fields:
+    place_id:
+      name: Park
+      description: The Google place_id of the park.
+      required: true
+      selector:
+        text:
+    filename:
+      name: Filename
+      description: The stored filename of the photo to remove.
+      required: true
+      selector:
+        text:

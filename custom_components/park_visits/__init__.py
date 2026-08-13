@@ -19,15 +19,18 @@ from .const import (
     MAX_OUR_RATING,
     MIN_OUR_RATING,
     SERVICE_ATTR_DISLIKED,
+    SERVICE_ATTR_FILENAME,
     SERVICE_ATTR_LIKED,
     SERVICE_ATTR_NOTE,
     SERVICE_ATTR_PLACE_ID,
     SERVICE_ATTR_RATING,
+    SERVICE_DELETE_PHOTO,
+    SERVICE_DELETE_REVIEW,
     SERVICE_RATE_PARK,
 )
 from .coordinator import ParkVisitsCoordinator
 from .storage import ParkListCache, ParkReviewStore
-from .views import async_register_views
+from .views import async_delete_photo_files, async_register_views
 
 PLATFORMS = ["geo_location", "sensor", "button"]
 
@@ -40,6 +43,15 @@ RATE_PARK_SCHEMA = vol.Schema(
         vol.Optional(SERVICE_ATTR_LIKED, default=""): cv.string,
         vol.Optional(SERVICE_ATTR_DISLIKED, default=""): cv.string,
         vol.Optional(SERVICE_ATTR_NOTE, default=""): cv.string,
+    }
+)
+
+DELETE_REVIEW_SCHEMA = vol.Schema({vol.Required(SERVICE_ATTR_PLACE_ID): cv.string})
+
+DELETE_PHOTO_SCHEMA = vol.Schema(
+    {
+        vol.Required(SERVICE_ATTR_PLACE_ID): cv.string,
+        vol.Required(SERVICE_ATTR_FILENAME): cv.string,
     }
 )
 
@@ -82,9 +94,34 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             disliked=call.data[SERVICE_ATTR_DISLIKED],
         )
 
+    async def _async_handle_delete_review(call: ServiceCall) -> None:
+        place_id = call.data[SERVICE_ATTR_PLACE_ID]
+        # Drop the record first so the photos can't be re-listed mid-delete,
+        # then remove the files it pointed at.
+        filenames = await coordinator.async_delete_review(place_id)
+        await async_delete_photo_files(hass, place_id, filenames)
+
+    async def _async_handle_delete_photo(call: ServiceCall) -> None:
+        place_id = call.data[SERVICE_ATTR_PLACE_ID]
+        filename = call.data[SERVICE_ATTR_FILENAME]
+        await coordinator.async_remove_photo(place_id, filename)
+        await async_delete_photo_files(hass, place_id, [filename])
+
     if not hass.services.has_service(DOMAIN, SERVICE_RATE_PARK):
         hass.services.async_register(
             DOMAIN, SERVICE_RATE_PARK, _async_handle_rate_park, schema=RATE_PARK_SCHEMA
+        )
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_DELETE_REVIEW,
+            _async_handle_delete_review,
+            schema=DELETE_REVIEW_SCHEMA,
+        )
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_DELETE_PHOTO,
+            _async_handle_delete_photo,
+            schema=DELETE_PHOTO_SCHEMA,
         )
 
     # Views are global rather than per-entry, and HA raises if the same view
@@ -112,4 +149,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # flag deliberately survives a reload.)
         if not any(isinstance(v, dict) and "coordinator" in v for v in hass.data[DOMAIN].values()):
             hass.services.async_remove(DOMAIN, SERVICE_RATE_PARK)
+            hass.services.async_remove(DOMAIN, SERVICE_DELETE_REVIEW)
+            hass.services.async_remove(DOMAIN, SERVICE_DELETE_PHOTO)
     return unload_ok
