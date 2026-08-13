@@ -1,12 +1,17 @@
-"""Persistent storage for our own park ratings/notes.
+"""Persistent storage for our own park reviews.
 
 Keyed by Google place_id so a review survives dataset refreshes and centre
 point / radius changes (a park keeps its Google identity even if it drops
 in or out of the configured search area).
+
+Photos are *not* stored here — only their filenames. The image bytes live
+on disk under `<config>/park_visits_photos/<place_id>/`, because this
+store is loaded into memory and rewritten in full on every save; a few
+base64 photos would bloat it badly.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
@@ -21,8 +26,28 @@ class Review:
     """A single stored review for one park."""
 
     rating: float
-    note: str
-    reviewed_at: str
+    liked: str = ""
+    disliked: str = ""
+    note: str = ""
+    photos: list[str] = field(default_factory=list)
+    reviewed_at: str = ""
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Review:
+        """Build from stored JSON, tolerating records written by older versions.
+
+        v1 reviews only had rating/note/reviewed_at. Reading them with
+        cls(**data) would work, but any future field added here would break
+        old records, so pull fields explicitly and default what's missing.
+        """
+        return cls(
+            rating=data.get("rating", 0),
+            liked=data.get("liked", ""),
+            disliked=data.get("disliked", ""),
+            note=data.get("note", ""),
+            photos=list(data.get("photos", [])),
+            reviewed_at=data.get("reviewed_at", ""),
+        )
 
 
 class ParkReviewStore:
@@ -39,7 +64,7 @@ class ParkReviewStore:
         raw: dict[str, Any] | None = await self._store.async_load()
         if raw:
             self._reviews = {
-                place_id: Review(**data) for place_id, data in raw.items()
+                place_id: Review.from_dict(data) for place_id, data in raw.items()
             }
 
     def get(self, place_id: str) -> Review | None:
@@ -50,15 +75,58 @@ class ParkReviewStore:
         """Return all stored reviews, keyed by place_id."""
         return dict(self._reviews)
 
-    async def async_set_review(self, place_id: str, rating: float, note: str) -> Review:
-        """Record (or overwrite) a review for a park and persist it."""
+    async def async_set_review(
+        self,
+        place_id: str,
+        rating: float,
+        liked: str = "",
+        disliked: str = "",
+        note: str = "",
+        photos: list[str] | None = None,
+    ) -> Review:
+        """Record (or overwrite) a review for a park and persist it.
+
+        Photos default to whatever is already stored rather than being
+        cleared, so editing a rating from a form that didn't re-upload the
+        images doesn't silently drop them.
+        """
+        existing = self._reviews.get(place_id)
         review = Review(
             rating=rating,
+            liked=liked,
+            disliked=disliked,
             note=note,
+            photos=list(photos) if photos is not None else (existing.photos if existing else []),
             reviewed_at=datetime.now(timezone.utc).isoformat(),
         )
         self._reviews[place_id] = review
+        await self._async_save()
+        return review
+
+    async def async_add_photo(self, place_id: str, filename: str) -> Review:
+        """Attach an uploaded photo to a park, creating a stub review if needed.
+
+        A photo can be uploaded before the rating is submitted (the form
+        uploads as soon as a file is picked), so this must not require an
+        existing review.
+        """
+        review = self._reviews.get(place_id)
+        if review is None:
+            review = Review(rating=0, reviewed_at="")
+            self._reviews[place_id] = review
+        if filename not in review.photos:
+            review.photos.append(filename)
+        await self._async_save()
+        return review
+
+    async def async_remove_photo(self, place_id: str, filename: str) -> None:
+        """Detach a photo from a park's review."""
+        review = self._reviews.get(place_id)
+        if review and filename in review.photos:
+            review.photos.remove(filename)
+            await self._async_save()
+
+    async def _async_save(self) -> None:
         await self._store.async_save(
             {place_id: asdict(r) for place_id, r in self._reviews.items()}
         )
-        return review

@@ -1,6 +1,9 @@
 rate_park:
   name: Rate a park
-  description: Record your own rating and note for a tracked park.
+  description: >-
+    Record your own review for a tracked park. Photos are attached separately
+    by the Park Visits table card, which uploads them to
+    /api/park_visits/upload/<place_id>.
   fields:
     place_id:
       name: Park
@@ -18,9 +21,23 @@ rate_park:
           max: 10
           step: 0.5
           mode: slider
+    liked:
+      name: What we liked
+      description: The good bits.
+      required: false
+      selector:
+        text:
+          multiline: true
+    disliked:
+      name: What we didn't like
+      description: The not-so-good bits.
+      required: false
+      selector:
+        text:
+          multiline: true
     note:
-      name: Note
-      description: What you thought of it.
+      name: Other notes
+      description: Anything else worth remembering.
       required: false
       selector:
         text:

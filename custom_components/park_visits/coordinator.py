@@ -67,6 +67,9 @@ class RankedPark:
     distance_km: float
     our_rating: float | None
     our_note: str
+    our_liked: str
+    our_disliked: str
+    our_photo_count: int
     our_reviewed_at: str | None
 
 
@@ -195,9 +198,15 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
                     "rating_count": place.get("userRatingCount", 0),
                     "google_maps_uri": place.get("googleMapsUri"),
                     "distance_km": haversine_km(center_lat, center_lon, lat, lon),
-                    "our_rating": review.rating if review else None,
+                    # A review created purely by a photo upload has no rating
+                    # yet (reviewed_at is empty) — treat that as unrated so it
+                    # doesn't show as 0/10.
+                    "our_rating": review.rating if (review and review.reviewed_at) else None,
                     "our_note": review.note if review else "",
-                    "our_reviewed_at": review.reviewed_at if review else None,
+                    "our_liked": review.liked if review else "",
+                    "our_disliked": review.disliked if review else "",
+                    "our_photo_count": len(review.photos) if review else 0,
+                    "our_reviewed_at": (review.reviewed_at or None) if review else None,
                 }
             )
 
@@ -218,14 +227,35 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
             result.append(RankedPark(rank=display_rank, unique_id=unique_id, **park))
         return result
 
-    async def async_submit_review(self, place_id: str, rating: float, note: str) -> None:
+    async def async_submit_review(
+        self,
+        place_id: str,
+        rating: float,
+        note: str = "",
+        liked: str = "",
+        disliked: str = "",
+    ) -> None:
         """Record a review locally and refresh entities without hitting the API."""
-        review = await self.reviews.async_set_review(place_id, rating, note)
-        if self.data:
-            for park in self.data:
-                if park.place_id == place_id:
-                    park.our_rating = review.rating
-                    park.our_note = review.note
-                    park.our_reviewed_at = review.reviewed_at
-                    break
+        await self.reviews.async_set_review(
+            place_id, rating, liked=liked, disliked=disliked, note=note
+        )
+        await self.async_refresh_reviews()
+
+    async def async_refresh_reviews(self) -> None:
+        """Re-apply stored reviews onto the current park list, no API call.
+
+        Used after a review or photo upload: the Google-sourced data is
+        unchanged, so re-fetching it would spend quota for nothing.
+        """
+        if not self.data:
+            return
+        reviews = self.reviews.all_reviews()
+        for park in self.data:
+            review = reviews.get(park.place_id)
+            park.our_rating = review.rating if (review and review.reviewed_at) else None
+            park.our_note = review.note if review else ""
+            park.our_liked = review.liked if review else ""
+            park.our_disliked = review.disliked if review else ""
+            park.our_photo_count = len(review.photos) if review else 0
+            park.our_reviewed_at = (review.reviewed_at or None) if review else None
         self.async_set_updated_data(self.data)

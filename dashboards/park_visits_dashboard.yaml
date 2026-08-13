@@ -10,39 +10,41 @@
 #  - The "Park Visits" integration installed and configured with a Google
 #    Places API key (Settings > Devices & Services > Add Integration >
 #    Park Visits).
-#  - www/park-visits-map-card.js copied to config/www/ and registered as a
-#    dashboard resource (Settings > Dashboards > Resources > Add Resource,
-#    URL "/local/park-visits-map-card.js", type "JavaScript module").
+#  - www/park-visits-table-card.js copied to config/www/ and registered as
+#    a dashboard resource (Settings > Dashboards > Resources > Add
+#    Resource, URL "/local/park-visits-table-card.js", type "JavaScript
+#    module").
 ########################################################################
 title: Park Visits
 views:
-  - title: Map
-    path: map
-    icon: mdi:map-legend
-    cards:
-      - type: custom:park-visits-map-card
-        title: Parks within range
-        source: park_visits
-        latitude: -27.6599
-        longitude: 153.2138
-        default_zoom: 8
-        height: 600px
-      - type: entities
-        title: Summary
-        entities:
-          - entity: sensor.nearby_parks
-            name: Parks tracked
-          - entity: button.refresh_parks
-            name: Refresh from Google
-
-  - title: List
-    path: list
+  - title: Parks
+    path: parks
+    type: sections
     icon: mdi:format-list-bulleted
-    cards:
-      # Click any column header to sort by it; click again to reverse.
-      - type: custom:park-visits-table-card
-        title: Top parks
-        source: park_visits
-        default_sort: rank
-        default_direction: asc
-        show_filter: true
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Top parks (click a park to see reviews and photos)
+            icon: mdi:format-list-numbered
+          # Click a column header to sort; click a park name for its
+          # detail panel, Google reviews/photos and our own review form.
+          - type: custom:park-visits-table-card
+            title: Top parks
+            source: park_visits
+            default_sort: rank
+            default_direction: asc
+            show_filter: true
+            grid_options:
+              columns: full
+              rows: auto
+          - type: tile
+            entity: sensor.nearby_parks
+            name: Parks tracked
+            grid_options:
+              columns: full
+          - type: tile
+            entity: button.refresh_parks
+            name: Refresh from Google
+            grid_options:
+              columns: full
