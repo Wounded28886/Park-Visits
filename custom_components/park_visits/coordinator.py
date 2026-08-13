@@ -269,6 +269,12 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         )
         return result
 
+    def park_name(self, place_id: str) -> str:
+        """Current display name for a park, if it's still tracked."""
+        if not self.data:
+            return ""
+        return next((p.name for p in self.data if p.place_id == place_id), "")
+
     async def async_submit_review(
         self,
         place_id: str,
@@ -279,8 +285,24 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
     ) -> None:
         """Record a review locally and refresh entities without hitting the API."""
         await self.reviews.async_set_review(
-            place_id, rating, liked=liked, disliked=disliked, note=note
+            place_id,
+            rating,
+            liked=liked,
+            disliked=disliked,
+            note=note,
+            park_name=self.park_name(place_id),
         )
+        await self.async_refresh_reviews()
+
+    async def async_delete_review(self, place_id: str) -> list[str]:
+        """Drop a review and report its photo filenames so they can be deleted."""
+        filenames = await self.reviews.async_delete_review(place_id)
+        await self.async_refresh_reviews()
+        return filenames
+
+    async def async_remove_photo(self, place_id: str, filename: str) -> None:
+        """Detach one photo from a review and refresh entities."""
+        await self.reviews.async_remove_photo(place_id, filename)
         await self.async_refresh_reviews()
 
     async def async_refresh_reviews(self) -> None:

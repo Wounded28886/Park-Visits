@@ -10,10 +10,11 @@
 #  - The "Park Visits" integration installed and configured with a Google
 #    Places API key (Settings > Devices & Services > Add Integration >
 #    Park Visits).
-#  - www/park-visits-table-card.js copied to config/www/ and registered as
-#    a dashboard resource (Settings > Dashboards > Resources > Add
-#    Resource, URL "/local/park-visits-table-card.js", type "JavaScript
-#    module").
+#  - www/park-visits-table-card.js and www/park-visits-gallery-card.js
+#    copied to config/www/ and each registered as a dashboard resource
+#    (Settings > Dashboards > Resources > Add Resource, URLs
+#    "/local/park-visits-table-card.js" and
+#    "/local/park-visits-gallery-card.js", type "JavaScript module").
 ########################################################################
 title: Park Visits
 views:
@@ -48,3 +49,19 @@ views:
             name: Refresh from Google
             grid_options:
               columns: full
+
+  - title: Gallery
+    path: gallery
+    type: sections
+    icon: mdi:image-multiple
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Our park photos (click one for the review)
+            icon: mdi:image-multiple
+          - type: custom:park-visits-gallery-card
+            title: Our photos
+            grid_options:
+              columns: full
+              rows: auto

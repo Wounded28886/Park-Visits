@@ -26,17 +26,25 @@ review — rating, what you liked, what you didn't, notes and photos.
   - One summary **sensor** (`sensor.nearby_parks`) reporting how many parks
     are currently tracked.
   - A **"Refresh parks" button** — see [Refresh cost](#refresh-cost-and-cadence).
-- Registers a **`park_visits.rate_park`** service to record your rating,
-  what you liked/disliked and notes. Reviews are stored locally (`.storage`,
-  keyed by Google's place_id) and survive dataset refreshes.
-- Ships a **custom Lovelace card** (`park-visits-table-card`):
-  - Spreadsheet-style sorting — click a header to sort, click again to
-    reverse. Numeric columns sort numerically (not alphabetically) and
-    unrated parks always sort to the bottom in both directions.
-  - A text filter across name, categories and address.
-  - Click a park's name for a detail panel: Google's rating, editorial
-    summary, opening hours, website, **photos and written reviews**, our own
-    review, and a form to write or update it including a photo upload.
+- Registers services to record and remove reviews: **`rate_park`** (rating,
+  liked, disliked, notes), **`delete_review`** (also deletes that review's
+  photo files) and **`delete_photo`** (one photo). Reviews are stored locally
+  (`.storage`, keyed by Google's place_id) and survive dataset refreshes —
+  including a park dropping out of the tracked list, since the park's name is
+  saved with the review.
+- Ships two **custom Lovelace cards**:
+  - `park-visits-table-card` — spreadsheet-style sorting (click a header to
+    sort, click again to reverse; numeric columns sort numerically and
+    unrated parks sink to the bottom in both directions), a text filter, and
+    a **Review** button on every row. Clicking a park's name opens a detail
+    panel with Google's rating, editorial summary, opening hours, website,
+    photos and written reviews, plus our own review. Writing or editing a
+    review opens its **own popup** in place of that panel, where you can set
+    a rating, record what you liked and didn't, add notes, attach photos,
+    delete individual photos, or delete the whole review.
+  - `park-visits-gallery-card` — a collage of every photo attached to a
+    review. Click one to see it large alongside the park name and our
+    review, and page through the rest.
 
 ## How photos and reviews are handled
 
@@ -93,11 +101,11 @@ save.
 HACS installs `custom_components/park_visits` but not the `www/` folder, so
 this step is always manual regardless of how you did step 1:
 
-1. Copy `www/park-visits-table-card.js` into your Home Assistant
-   `config/www/` directory.
-2. **Settings > Dashboards > ⋮ > Resources > Add Resource**:
-   - URL: `/local/park-visits-table-card.js`
-   - Resource type: **JavaScript module**
+1. Copy `www/park-visits-table-card.js` and `www/park-visits-gallery-card.js`
+   into your Home Assistant `config/www/` directory.
+2. **Settings > Dashboards > ⋮ > Resources > Add Resource** — once for each:
+   - `/local/park-visits-table-card.js` — type **JavaScript module**
+   - `/local/park-visits-gallery-card.js` — type **JavaScript module**
 3. Hard-refresh your browser (a plain refresh can serve a cached copy of a
    resource URL — if the card doesn't render or doesn't pick up an update,
    this is the first thing to try, or bump the resource URL to `...js?v=2`).
@@ -156,10 +164,11 @@ custom_components/park_visits/
 ├── geo_location.py     # one GeolocationEvent entity per tracked park
 ├── sensor.py           # summary "Nearby Parks" count sensor
 ├── button.py           # manual "Refresh parks" button — the only API trigger
-├── services.yaml       # rate_park service description (Developer Tools UI)
+├── services.yaml       # service descriptions (Developer Tools UI)
 └── strings.json / translations/en.json
 www/
-└── park-visits-table-card.js   # sortable table + park detail panel + review form
+├── park-visits-table-card.js     # sortable table, park detail panel, review form
+└── park-visits-gallery-card.js   # collage of our review photos
 dashboards/
 └── park_visits_dashboard.yaml
 ```

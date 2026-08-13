@@ -23,7 +23,12 @@ from .const import PARKS_CACHE_KEY_TEMPLATE, STORAGE_KEY_TEMPLATE, STORAGE_VERSI
 
 @dataclass
 class Review:
-    """A single stored review for one park."""
+    """A single stored review for one park.
+
+    ``park_name`` is denormalised deliberately: a park can drop out of the
+    tracked list (rating shifts, radius changes) while its review and photos
+    live on, and the gallery still needs something to label them with.
+    """
 
     rating: float
     liked: str = ""
@@ -31,6 +36,7 @@ class Review:
     note: str = ""
     photos: list[str] = field(default_factory=list)
     reviewed_at: str = ""
+    park_name: str = ""
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Review:
@@ -47,6 +53,7 @@ class Review:
             note=data.get("note", ""),
             photos=list(data.get("photos", [])),
             reviewed_at=data.get("reviewed_at", ""),
+            park_name=data.get("park_name", ""),
         )
 
 
@@ -83,6 +90,7 @@ class ParkReviewStore:
         disliked: str = "",
         note: str = "",
         photos: list[str] | None = None,
+        park_name: str = "",
     ) -> Review:
         """Record (or overwrite) a review for a park and persist it.
 
@@ -98,12 +106,26 @@ class ParkReviewStore:
             note=note,
             photos=list(photos) if photos is not None else (existing.photos if existing else []),
             reviewed_at=datetime.now(timezone.utc).isoformat(),
+            park_name=park_name or (existing.park_name if existing else ""),
         )
         self._reviews[place_id] = review
         await self._async_save()
         return review
 
-    async def async_add_photo(self, place_id: str, filename: str) -> Review:
+    async def async_delete_review(self, place_id: str) -> list[str]:
+        """Forget a park's review entirely, returning the photo filenames.
+
+        The caller deletes the files: this store only ever tracks names.
+        """
+        review = self._reviews.pop(place_id, None)
+        if review is None:
+            return []
+        await self._async_save()
+        return list(review.photos)
+
+    async def async_add_photo(
+        self, place_id: str, filename: str, park_name: str = ""
+    ) -> Review:
         """Attach an uploaded photo to a park, creating a stub review if needed.
 
         A photo can be uploaded before the rating is submitted (the form
@@ -112,8 +134,10 @@ class ParkReviewStore:
         """
         review = self._reviews.get(place_id)
         if review is None:
-            review = Review(rating=0, reviewed_at="")
+            review = Review(rating=0, reviewed_at="", park_name=park_name)
             self._reviews[place_id] = review
+        elif park_name and not review.park_name:
+            review.park_name = park_name
         if filename not in review.photos:
             review.photos.append(filename)
         await self._async_save()

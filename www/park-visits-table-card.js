@@ -90,6 +90,15 @@ const COLUMNS = [
       return bits.join(" ") || "—";
     },
   },
+  {
+    key: "review",
+    label: "",
+    sortable: false,
+    display: (s) =>
+      `<button class="pv-rowbtn" data-entity="${escapeHtml(s.entity_id)}">${
+        s.attributes.our_reviewed_at != null ? "Edit" : "Review"
+      }</button>`,
+  },
 ];
 
 class ParkVisitsTableCard extends HTMLElement {
@@ -172,7 +181,43 @@ class ParkVisitsTableCard extends HTMLElement {
       (this._googlePhotoUrls || []).length,
       (this._ourPhotoUrls || []).length,
       this._formOpen ? "form" : "noform",
+      this._pendingReview ? JSON.stringify(this._pendingReview) : "-",
     ].join("|");
+  }
+
+  /**
+   * Entity attributes, with a just-saved (or just-deleted) review overlaid.
+   *
+   * Saving is a service call; the updated entity state arrives moments later
+   * on the next hass push. Rendering straight from the entity in that gap
+   * would flash "We haven't reviewed this park yet" at someone who has just
+   * written a review, so the submitted values stand in until the real state
+   * catches up.
+   */
+  _effectiveAttributes(state) {
+    const a = state.attributes;
+    const pending = this._pendingReview;
+    if (!pending || pending.placeId !== a.place_id) return a;
+
+    const caughtUp = pending.cleared
+      ? a.our_reviewed_at == null
+      : a.our_reviewed_at != null && Number(a.our_rating) === Number(pending.rating);
+    if (caughtUp) {
+      this._pendingReview = null;
+      return a;
+    }
+
+    return pending.cleared
+      ? {
+          ...a,
+          our_rating: null,
+          our_liked: "",
+          our_disliked: "",
+          our_note: "",
+          our_reviewed_at: null,
+          our_photo_count: 0,
+        }
+      : { ...a, ...pending.values };
   }
 
   _maybeRerenderDialog() {
@@ -199,13 +244,14 @@ class ParkVisitsTableCard extends HTMLElement {
           }
           <div class="pv-scroll">
             <table class="pv-table">
-              <thead><tr>${COLUMNS.map(
-                (c) =>
-                  `<th data-key="${c.key}" title="Sort by ${escapeHtml(
-                    c.label
-                  )}"><span class="pv-th">${escapeHtml(
-                    c.label
-                  )}<span class="pv-arrow"></span></span></th>`
+              <thead><tr>${COLUMNS.map((c) =>
+                c.sortable === false
+                  ? `<th class="pv-nosort"></th>`
+                  : `<th data-key="${c.key}" title="Sort by ${escapeHtml(
+                      c.label
+                    )}"><span class="pv-th">${escapeHtml(
+                      c.label
+                    )}<span class="pv-arrow"></span></span></th>`
               ).join("")}</tr></thead>
               <tbody></tbody>
             </table>
@@ -217,7 +263,7 @@ class ParkVisitsTableCard extends HTMLElement {
       ${STYLES}
     `;
 
-    this.querySelectorAll("th").forEach((th) => {
+    this.querySelectorAll("th[data-key]").forEach((th) => {
       th.addEventListener("click", () => this._onHeaderClick(th.dataset.key));
     });
     const filterEl = this.querySelector(".pv-filter");
@@ -228,8 +274,14 @@ class ParkVisitsTableCard extends HTMLElement {
         this._renderRows();
       });
     }
-    // Delegated so it survives every tbody rebuild.
+    // Delegated so they survive every tbody rebuild.
     this.querySelector("tbody").addEventListener("click", (ev) => {
+      const button = ev.target.closest(".pv-rowbtn");
+      if (button) {
+        ev.preventDefault();
+        this._openPark(button.dataset.entity, { straightToForm: true });
+        return;
+      }
       const link = ev.target.closest(".pv-name");
       if (!link) return;
       ev.preventDefault();
@@ -324,11 +376,13 @@ class ParkVisitsTableCard extends HTMLElement {
 
   /* -------------------------------------------------------------- dialog */
 
-  async _openPark(entityId) {
+  async _openPark(entityId, { straightToForm = false } = {}) {
     this._openEntity = entityId;
     this._details = null;
     this._detailsError = null;
-    this._formOpen = false;
+    // The form is a separate popup that takes the place of the detail view,
+    // rather than a panel appended under Google's reviews.
+    this._formOpen = straightToForm;
     this._renderDialog();
 
     const state = this._hass.states[entityId];
@@ -389,6 +443,7 @@ class ParkVisitsTableCard extends HTMLElement {
     this._ourPhotoUrls = [];
     this._formOpen = false;
     this._renderedSignature = null;
+    this._pendingReview = null;
     this.querySelector(".pv-dialog-root").innerHTML = "";
   }
 
@@ -410,7 +465,7 @@ class ParkVisitsTableCard extends HTMLElement {
     // reader back to the top of a long park page.
     const previousBackdrop = root.querySelector(".pv-backdrop");
     const previousScroll = previousBackdrop ? previousBackdrop.scrollTop : 0;
-    const a = state.attributes;
+    const a = this._effectiveAttributes(state);
     const d = this._details;
 
     const googlePhotos = (this._googlePhotoUrls || [])
@@ -460,14 +515,10 @@ class ParkVisitsTableCard extends HTMLElement {
         </div>`
       : `<div class="muted">We haven't reviewed this park yet.</div>`;
 
-    root.innerHTML = `
-      <div class="pv-backdrop">
-        <div class="pv-dialog" role="dialog" aria-modal="true">
-          <div class="pv-dialog-head">
-            <h2>${escapeHtml(a.friendly_name || state.entity_id)}</h2>
-            <button class="pv-close" title="Close">✕</button>
-          </div>
-          <div class="pv-dialog-body">
+    const title = escapeHtml(a.friendly_name || state.entity_id);
+    const body = this._formOpen
+      ? this._formHtml(a, hasOurReview)
+      : `
             <div class="pv-meta">
               ${
                 a.rating != null
@@ -509,6 +560,16 @@ class ParkVisitsTableCard extends HTMLElement {
               ${d && d.phone ? `<span class="muted">${escapeHtml(d.phone)}</span>` : ""}
             </div>
 
+            <div class="pv-actions">
+              <button class="pv-btn pv-write">${
+                hasOurReview ? "Edit our review" : "Write a review"
+              }</button>
+            </div>
+
+            <h3>Our review</h3>
+            ${ourReview}
+            ${ourPhotos ? `<div class="pv-photos">${ourPhotos}</div>` : ""}
+
             ${
               googlePhotos
                 ? `<h3>Photos from Google</h3><div class="pv-photos">${googlePhotos}</div>`
@@ -516,20 +577,16 @@ class ParkVisitsTableCard extends HTMLElement {
             }
 
             <h3>Reviews from Google</h3>
-            ${googleReviews}
+            ${googleReviews}`;
 
-            <h3>Our review</h3>
-            ${ourReview}
-            ${ourPhotos ? `<div class="pv-photos">${ourPhotos}</div>` : ""}
-
-            <div class="pv-actions">
-              <button class="pv-btn pv-write">${
-                hasOurReview ? "Edit our review" : "Write a review"
-              }</button>
-            </div>
-
-            ${this._formOpen ? this._formHtml(a) : ""}
+    root.innerHTML = `
+      <div class="pv-backdrop">
+        <div class="pv-dialog" role="dialog" aria-modal="true">
+          <div class="pv-dialog-head">
+            <h2>${this._formOpen ? `${hasOurReview ? "Edit" : "Write"} review — ${title}` : title}</h2>
+            <button class="pv-close" title="Close">✕</button>
           </div>
+          <div class="pv-dialog-body">${body}</div>
         </div>
       </div>
     `;
@@ -538,13 +595,23 @@ class ParkVisitsTableCard extends HTMLElement {
     if (backdrop && previousScroll) backdrop.scrollTop = previousScroll;
     this._renderedSignature = this._dialogSignature();
 
-    // A signed photo URL can still 404 (e.g. Google details fell out of the
-    // server-side cache), which would otherwise leave an empty grey tile.
+    // A signed photo URL can still fail (Google details fell out of the
+    // server-side cache, or one of our files went missing). Drop dead
+    // thumbnails rather than leaving grey boxes — but keep any that carry a
+    // delete button, otherwise a missing file would leave an entry in the
+    // review that can never be cleared.
     root.querySelectorAll(".pv-photo").forEach((img) => {
       img.addEventListener("error", () => {
-        img.remove();
+        const wrapper = img.closest(".pv-photo-wrap");
+        if (wrapper && wrapper.querySelector(".pv-photo-del")) {
+          img.remove();
+          wrapper.classList.add("pv-photo-broken");
+          wrapper.setAttribute("title", "This photo file is missing");
+          return;
+        }
+        (wrapper || img).remove();
         root.querySelectorAll(".pv-photos").forEach((strip) => {
-          if (!strip.querySelector(".pv-photo")) strip.remove();
+          if (!strip.querySelector(".pv-photo, .pv-photo-broken")) strip.remove();
         });
       });
     });
@@ -553,39 +620,129 @@ class ParkVisitsTableCard extends HTMLElement {
     root.querySelector(".pv-backdrop").addEventListener("click", (ev) => {
       if (ev.target.classList.contains("pv-backdrop")) this._closeDialog();
     });
-    root.querySelector(".pv-write").addEventListener("click", () => {
-      this._formOpen = !this._formOpen;
-      this._renderDialog();
-    });
+
+    const write = root.querySelector(".pv-write");
+    if (write) {
+      write.addEventListener("click", () => {
+        this._formOpen = true;
+        this._renderDialog();
+      });
+    }
 
     const form = root.querySelector(".pv-form");
-    if (form) this._wireForm(form, a);
+    if (form) this._wireForm(form, a, hasOurReview);
   }
 
-  _formHtml(a) {
+  _formHtml(a, hasOurReview) {
+    // Existing photos get their own delete buttons; removing one is immediate
+    // and separate from saving the text fields.
+    const existing = (this._ourPhotoUrls || [])
+      .map(
+        (p) => `
+        <div class="pv-photo-wrap">
+          <img class="pv-photo" src="${escapeHtml(p.url)}" loading="lazy" alt="">
+          <button type="button" class="pv-photo-del" data-filename="${escapeHtml(
+            p.filename
+          )}" title="Delete this photo">✕</button>
+        </div>`
+      )
+      .join("");
+
     return `
       <form class="pv-form">
         <label>Rating (0–10)</label>
         <input type="number" name="rating" min="0" max="10" step="0.5"
                value="${escapeHtml(a.our_rating ?? "")}" required>
         <label>What we liked</label>
-        <textarea name="liked" rows="2">${escapeHtml(a.our_liked || "")}</textarea>
+        <textarea name="liked" rows="3">${escapeHtml(a.our_liked || "")}</textarea>
         <label>What we didn't like</label>
-        <textarea name="disliked" rows="2">${escapeHtml(a.our_disliked || "")}</textarea>
+        <textarea name="disliked" rows="3">${escapeHtml(a.our_disliked || "")}</textarea>
         <label>Other notes</label>
-        <textarea name="note" rows="2">${escapeHtml(a.our_note || "")}</textarea>
+        <textarea name="note" rows="3">${escapeHtml(a.our_note || "")}</textarea>
+        ${existing ? `<label>Photos</label><div class="pv-photos">${existing}</div>` : ""}
         <label>Add a photo</label>
         <input type="file" name="photo" accept="image/*">
         <div class="pv-form-actions">
           <button type="submit" class="pv-btn">Save review</button>
+          <button type="button" class="pv-btn pv-secondary pv-cancel">Cancel</button>
+          ${
+            hasOurReview
+              ? `<button type="button" class="pv-btn pv-danger pv-delete">Delete review</button>`
+              : ""
+          }
           <span class="pv-status"></span>
         </div>
       </form>`;
   }
 
-  _wireForm(form, attrs) {
+  _wireForm(form, attrs, hasOurReview) {
     const status = form.querySelector(".pv-status");
     const placeId = attrs.place_id;
+
+    form.querySelector(".pv-cancel").addEventListener("click", () => {
+      this._formOpen = false;
+      this._renderDialog();
+    });
+
+    const deleteButton = form.querySelector(".pv-delete");
+    if (deleteButton) {
+      deleteButton.addEventListener("click", async () => {
+        if (this._busy) return;
+        // Deleting also removes the photo files from disk, so make that plain
+        // before doing it.
+        const photoCount = (this._ourPhotoUrls || []).length;
+        const warning = photoCount
+          ? `Delete our review and ${photoCount} uploaded photo${
+              photoCount === 1 ? "" : "s"
+            }? This can't be undone.`
+          : "Delete our review? This can't be undone.";
+        if (!window.confirm(warning)) return;
+
+        this._busy = true;
+        status.textContent = "Deleting…";
+        status.className = "pv-status";
+        try {
+          await this._hass.callService("park_visits", "delete_review", {
+            place_id: placeId,
+          });
+          this._pendingReview = { placeId, cleared: true };
+          this._formOpen = false;
+          this._ourPhotoUrls = [];
+          await this._reloadDetails(placeId);
+          this._renderDialog();
+        } catch (err) {
+          status.textContent = `Couldn't delete: ${err && err.message ? err.message : err}`;
+          status.classList.add("err");
+        } finally {
+          this._busy = false;
+        }
+      });
+    }
+
+    form.querySelectorAll(".pv-photo-del").forEach((button) => {
+      button.addEventListener("click", async () => {
+        if (this._busy) return;
+        if (!window.confirm("Delete this photo? This can't be undone.")) return;
+        this._busy = true;
+        status.textContent = "Deleting photo…";
+        status.className = "pv-status";
+        try {
+          await this._hass.callService("park_visits", "delete_photo", {
+            place_id: placeId,
+            filename: button.dataset.filename,
+          });
+          await this._reloadDetails(placeId);
+          this._renderDialog();
+        } catch (err) {
+          status.textContent = `Couldn't delete photo: ${
+            err && err.message ? err.message : err
+          }`;
+          status.classList.add("err");
+        } finally {
+          this._busy = false;
+        }
+      });
+    });
 
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
@@ -594,14 +751,29 @@ class ParkVisitsTableCard extends HTMLElement {
       status.textContent = "Saving…";
       status.className = "pv-status";
 
+      const submitted = {
+        rating: parseFloat(form.rating.value),
+        liked: form.liked.value,
+        disliked: form.disliked.value,
+        note: form.note.value,
+      };
+
       try {
         await this._hass.callService("park_visits", "rate_park", {
           place_id: placeId,
-          rating: parseFloat(form.rating.value),
-          liked: form.liked.value,
-          disliked: form.disliked.value,
-          note: form.note.value,
+          ...submitted,
         });
+        this._pendingReview = {
+          placeId,
+          rating: submitted.rating,
+          values: {
+            our_rating: submitted.rating,
+            our_liked: submitted.liked,
+            our_disliked: submitted.disliked,
+            our_note: submitted.note,
+            our_reviewed_at: new Date().toISOString(),
+          },
+        };
 
         const file = form.photo.files && form.photo.files[0];
         if (file) {
@@ -612,14 +784,7 @@ class ParkVisitsTableCard extends HTMLElement {
         status.textContent = "Saved ✓";
         status.classList.add("ok");
         this._formOpen = false;
-        // Re-read details to pick up the new photo list. This hits the 24h
-        // cache for the Google half, so it costs no API quota.
-        try {
-          this._details = await this._hass.callApi("GET", `park_visits/details/${placeId}`);
-          await this._loadPhotoUrls(placeId);
-        } catch (e) {
-          /* keep whatever we already had */
-        }
+        await this._reloadDetails(placeId);
         this._renderDialog();
       } catch (err) {
         status.textContent = `Couldn't save: ${err && err.message ? err.message : err}`;
@@ -628,6 +793,18 @@ class ParkVisitsTableCard extends HTMLElement {
         this._busy = false;
       }
     });
+  }
+
+  async _reloadDetails(placeId) {
+    // Re-read details to pick up the current photo list. The Google half of
+    // the response comes from the 24h server-side cache, so this costs no
+    // API quota.
+    try {
+      this._details = await this._hass.callApi("GET", `park_visits/details/${placeId}`);
+      await this._loadPhotoUrls(placeId);
+    } catch (err) {
+      /* keep whatever we already had */
+    }
   }
 
   async _uploadPhoto(placeId, file) {
@@ -751,10 +928,41 @@ const STYLES = `
     border-radius: 6px; border: 1px solid var(--divider-color, #333);
     background: var(--primary-background-color, #111); color: var(--primary-text-color, #eee);
   }
-  .pv-form-actions { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .pv-form-actions {
+    display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap;
+  }
   .pv-status { font-size: 13px; }
   .pv-status.ok { color: var(--success-color, #4caf50); }
   .pv-status.err { color: var(--error-color, #f44336); }
+  .pv-secondary {
+    background: var(--secondary-background-color, #2a2a2a);
+    color: var(--primary-text-color, #eee);
+  }
+  .pv-danger { background: var(--error-color, #f44336); margin-left: auto; }
+  .pv-rowbtn {
+    padding: 4px 12px; border: 1px solid var(--divider-color, #333); border-radius: 6px;
+    background: var(--secondary-background-color, #2a2a2a);
+    color: var(--primary-text-color, #eee); cursor: pointer; font: inherit; font-size: 13px;
+    white-space: nowrap;
+  }
+  .pv-rowbtn:hover { border-color: var(--primary-color, #03a9f4); color: var(--primary-color, #03a9f4); }
+  .pv-nosort { cursor: default; }
+  .pv-photo-wrap { position: relative; flex: 0 0 auto; }
+  .pv-photo-del {
+    position: absolute; top: 4px; right: 4px; width: 22px; height: 22px;
+    border: none; border-radius: 50%; cursor: pointer; line-height: 1;
+    background: rgba(0,0,0,0.65); color: #fff; font-size: 12px;
+  }
+  .pv-photo-del:hover { background: var(--error-color, #f44336); }
+  .pv-photo-broken {
+    width: 130px; height: 130px; border-radius: 8px;
+    background: var(--secondary-background-color, #2a2a2a);
+    border: 1px dashed var(--divider-color, #444);
+  }
+  .pv-photo-broken::after {
+    content: "missing"; display: flex; align-items: center; justify-content: center;
+    height: 100%; font-size: 12px; opacity: 0.6;
+  }
 </style>`;
 
 customElements.define("park-visits-table-card", ParkVisitsTableCard);
