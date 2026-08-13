@@ -4,8 +4,10 @@ A Home Assistant custom integration that tracks the top-rated parks within a
 configurable radius of a configurable centre point — defaults to
 **Cornubia, City of Logan, Queensland, Australia** (-27.6599, 153.2138) and a
 **100 km** radius — using the **Google Places API**, ranked by Google rating.
-Includes a custom Lovelace map card: click a park's marker to see its
-details and submit your own rating/note, which is stored locally.
+
+The dashboard is a sortable table: click a column to sort by it, click a park
+to open its detail panel with Google's photos and reviews, and write your own
+review — rating, what you liked, what you didn't, notes and photos.
 
 ## What it does
 
@@ -18,29 +20,42 @@ details and submit your own rating/note, which is stored locally.
   (e.g. a place can be both a "Park" and a "Tourist Attraction"), not a
   single fixed category.
 - Creates:
-  - One **`geo_location`** entity per tracked park (so the built-in **Map**
-    card, or the bundled custom map card, can plot them), with attributes
-    for rank, categories, address, Google rating/count, a Google Maps link,
-    and your own rating/note if you've left one.
+  - One **`geo_location`** entity per tracked park, carrying rank,
+    categories, address, Google rating/count, a Google Maps link, and our
+    own review summary.
   - One summary **sensor** (`sensor.nearby_parks`) reporting how many parks
     are currently tracked.
-- Registers a **`park_visits.rate_park`** service — call it with a park's
-  `place_id`, a `rating` (0-10) and an optional `note` to record what you
-  thought of it. Reviews are stored locally (`.storage`, keyed by Google's
-  place_id) and survive dataset refreshes.
-- Ships two **custom Lovelace cards**:
-  - `park-visits-map-card` — a Leaflet map of every tracked park where
-    clicking a marker opens a popup with the park's details, your past
-    rating if any, and a small form to submit a new one, calling the
-    service above directly from the map.
-  - `park-visits-table-card` — a spreadsheet-style table: click any column
-    header to sort by it, click again to reverse. Numeric columns sort
-    numerically (not alphabetically) and unrated parks always sort to the
-    bottom in both directions. Includes a quick text filter.
-- Adds a **"Refresh parks" button** entity. There is no automatic polling —
-  that button (plus the initial fetch on setup, or on an options change) is
-  the only thing that ever calls the Google API, so you control exactly
-  when quota gets spent.
+  - A **"Refresh parks" button** — see [Refresh cost](#refresh-cost-and-cadence).
+- Registers a **`park_visits.rate_park`** service to record your rating,
+  what you liked/disliked and notes. Reviews are stored locally (`.storage`,
+  keyed by Google's place_id) and survive dataset refreshes.
+- Ships a **custom Lovelace card** (`park-visits-table-card`):
+  - Spreadsheet-style sorting — click a header to sort, click again to
+    reverse. Numeric columns sort numerically (not alphabetically) and
+    unrated parks always sort to the bottom in both directions.
+  - A text filter across name, categories and address.
+  - Click a park's name for a detail panel: Google's rating, editorial
+    summary, opening hours, website, **photos and written reviews**, our own
+    review, and a form to write or update it including a photo upload.
+
+## How photos and reviews are handled
+
+Google's reviews and photos are **not** part of the bulk park search — they
+live on pricier SKUs, so fetching them for every tracked park on each refresh
+would cost far more than the search itself. Instead the integration calls
+**Place Details for a single park, only when you open it**, and caches the
+result for 24 hours (so reopening a park is free).
+
+Photo URLs from Google require the API key. Rather than putting that in an
+`<img src>` — which would expose the key to every browser that loads the page
+— the integration proxies photo bytes server-side and hands the frontend a
+**short-lived signed URL** via Home Assistant's `auth/sign_path`. The key
+never leaves your instance.
+
+Your own uploaded photos are written to `<config>/park_visits_photos/<place_id>/`
+and served through the same signed-path mechanism. Only the filenames are kept
+in the review store, since that file is held in memory and rewritten on every
+save.
 
 ## Installation
 
@@ -48,8 +63,7 @@ details and submit your own rating/note, which is stored locally.
 
 **Via HACS (recommended):** HACS > Integrations > ⋮ > Custom repositories
 > add `https://github.com/Wounded28886/Park-Visits` as category
-"Integration" (skip this if it's already added — search for "Park Visits"
-directly instead). Install it, then restart Home Assistant.
+"Integration". Install it, then restart Home Assistant.
 
 **Manual:** copy `custom_components/park_visits` into your Home Assistant
 `config/custom_components/` directory, then restart Home Assistant.
@@ -59,88 +73,86 @@ directly instead). Install it, then restart Home Assistant.
 1. Create/select a project at [console.cloud.google.com](https://console.cloud.google.com).
 2. **APIs & Services > Library** → enable **Places API (New)**.
 3. **Billing** → link a billing account (Google gives ~$200/month free
-   credit; Nearby Search runs ~$0.032/request at Basic field tier, and one
-   full refresh of a 100km radius costs roughly $0.35-0.60 depending on how
-   many tiles that radius needs — see "Refresh cost" below).
+   credit). See [Refresh cost](#refresh-cost-and-cadence) for what this
+   integration actually spends.
 4. **APIs & Services > Credentials > Create Credentials > API key**, then
    restrict it to "Places API (New)" only.
 
 ### 3. Add the integration
 
-1. Go to **Settings > Devices & Services > Add Integration**, search for
+1. **Settings > Devices & Services > Add Integration**, search for
    **Park Visits**.
 2. Paste your Google Places API key, and accept the defaults (Cornubia,
    100 km, top 100) or adjust the centre latitude/longitude, radius and
    number of parks to show.
-3. You can change these later via the integration's **Configure** button
-   — this triggers a reload and regenerates the tracked parks.
+3. You can change these later via the integration's **Configure** button —
+   this triggers a reload and regenerates the tracked parks.
 
-### 4. Install the custom cards
+### 4. Install the custom card
 
 HACS installs `custom_components/park_visits` but not the `www/` folder, so
 this step is always manual regardless of how you did step 1:
 
-1. Copy both `www/park-visits-map-card.js` and
-   `www/park-visits-table-card.js` into your Home Assistant `config/www/`
-   directory.
-2. **Settings > Dashboards > ⋮ > Resources > Add Resource** — once for each:
-   - URL: `/local/park-visits-map-card.js` — type **JavaScript module**
-   - URL: `/local/park-visits-table-card.js` — type **JavaScript module**
+1. Copy `www/park-visits-table-card.js` into your Home Assistant
+   `config/www/` directory.
+2. **Settings > Dashboards > ⋮ > Resources > Add Resource**:
+   - URL: `/local/park-visits-table-card.js`
+   - Resource type: **JavaScript module**
 3. Hard-refresh your browser (a plain refresh can serve a cached copy of a
-   resource URL — if a card doesn't render or doesn't pick up an update,
-   this is the first thing to try, or bump the resource URL to
-   `...js?v=2` etc.).
+   resource URL — if the card doesn't render or doesn't pick up an update,
+   this is the first thing to try, or bump the resource URL to `...js?v=2`).
 
 ### 5. Add the dashboard
 
-1. Go to **Settings > Dashboards > Add Dashboard > New dashboard from
-   scratch**, give it a name, then open it and choose **Edit in YAML**
-   from the three-dot menu.
+1. **Settings > Dashboards > Add Dashboard > New dashboard from scratch**,
+   give it a name, then open it and choose **Edit in YAML** from the
+   three-dot menu.
 2. Paste the contents of
    [`dashboards/park_visits_dashboard.yaml`](dashboards/park_visits_dashboard.yaml).
-3. Save. You'll get a **Map** view (click any pin to see details and rate
-   the park) and a **List** view (a ranked table of every tracked park,
-   including your own ratings).
 
-If your sensor's entity ID isn't exactly `sensor.nearby_parks` (Home
-Assistant may suffix it if you have multiple entries), that's fine — the
-map card filters by the `source: park_visits` attribute, not entity ID.
+The card filters by the `source: park_visits` attribute rather than entity
+IDs, so it keeps working if Home Assistant suffixes your entity names.
 
 ## Refresh cost and cadence
 
-There is **no automatic polling**. The only things that call the Google
-API are: the initial fetch when you add the integration, a reload after
-you change its options (centre point, radius, count, or API key), and
-pressing the **"Refresh parks"** button. Everything else — including
-submitting a review through the map card — updates entities from
-already-fetched data and costs nothing.
+There is **no automatic polling**. Google is contacted only when:
 
-Every one of those fetches tiles the configured radius into overlapping
-50km-radius Nearby Search requests (Google's per-request cap), so cost
-scales with radius: the default 100km radius needs on the order of 15-20
-requests per press, roughly $0.35-0.60 at Basic field-tier pricing. Press
-it as often (or rarely) as you like — nothing else will call Google on
-your behalf.
+| Action | Cost |
+|---|---|
+| Adding the integration, or changing its options | One full park search |
+| Pressing **Refresh parks** | One full park search |
+| Opening a park for the first time in 24h | One Place Details call |
+| Viewing a park's Google photos | One photo fetch each |
+
+A full park search tiles the configured radius into overlapping 50km-radius
+Nearby Search requests (Google's per-request cap), so cost scales with
+radius: the default 100km needs on the order of 15-20 requests, roughly
+$0.35-0.60 at Basic field-tier pricing. Place Details with reviews sits on a
+pricier SKU (order of a few cents per park opened), which is exactly why it
+is fetched on demand and cached rather than pulled for all 100 parks.
+
+Writing a review, uploading a photo, and sorting/filtering the table cost
+nothing — they never touch Google.
 
 ## Architecture
 
 ```
 custom_components/park_visits/
-├── __init__.py         # entry setup/unload, options-change reload, rate_park service
+├── __init__.py         # entry setup/unload, rate_park service, view registration
 ├── manifest.json       # HA integration manifest
 ├── const.py            # domain, defaults, Google Places config, attribute keys
-├── util.py              # haversine distance + geodesic tile-centre calculation
-├── coordinator.py       # tiled Google Places queries, ranking, review merging
-├── storage.py            # persistent local review storage (place_id -> rating/note)
-├── config_flow.py       # setup + options UI (API key, centre point, radius, count)
-├── geo_location.py      # one GeolocationEvent entity per tracked park
-├── sensor.py             # summary "Nearby Parks" count sensor
-├── button.py             # manual "Refresh parks" button — the only trigger for an API call
-├── services.yaml         # rate_park service description (Developer Tools UI)
+├── util.py             # haversine distance + geodesic tile-centre calculation
+├── coordinator.py      # tiled Google Places queries, ranking, review merging
+├── storage.py          # persistent local reviews (place_id -> rating/liked/photos)
+├── views.py            # HTTP: Place Details, photo proxy, photo upload/serve
+├── config_flow.py      # setup + options UI (API key, centre point, radius, count)
+├── geo_location.py     # one GeolocationEvent entity per tracked park
+├── sensor.py           # summary "Nearby Parks" count sensor
+├── button.py           # manual "Refresh parks" button — the only API trigger
+├── services.yaml       # rate_park service description (Developer Tools UI)
 └── strings.json / translations/en.json
 www/
-├── park-visits-map-card.js     # custom card: map + click-to-rate popups
-└── park-visits-table-card.js   # custom card: sortable/filterable table
+└── park-visits-table-card.js   # sortable table + park detail panel + review form
 dashboards/
 └── park_visits_dashboard.yaml
 ```

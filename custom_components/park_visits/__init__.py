@@ -18,6 +18,8 @@ from .const import (
     DOMAIN,
     MAX_OUR_RATING,
     MIN_OUR_RATING,
+    SERVICE_ATTR_DISLIKED,
+    SERVICE_ATTR_LIKED,
     SERVICE_ATTR_NOTE,
     SERVICE_ATTR_PLACE_ID,
     SERVICE_ATTR_RATING,
@@ -25,6 +27,7 @@ from .const import (
 )
 from .coordinator import ParkVisitsCoordinator
 from .storage import ParkReviewStore
+from .views import async_register_views
 
 PLATFORMS = ["geo_location", "sensor", "button"]
 
@@ -34,6 +37,8 @@ RATE_PARK_SCHEMA = vol.Schema(
         vol.Required(SERVICE_ATTR_RATING): vol.All(
             vol.Coerce(float), vol.Range(min=MIN_OUR_RATING, max=MAX_OUR_RATING)
         ),
+        vol.Optional(SERVICE_ATTR_LIKED, default=""): cv.string,
+        vol.Optional(SERVICE_ATTR_DISLIKED, default=""): cv.string,
         vol.Optional(SERVICE_ATTR_NOTE, default=""): cv.string,
     }
 )
@@ -64,13 +69,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "tracked list, so a review can't be attached to it"
             )
         await coordinator.async_submit_review(
-            place_id, call.data[SERVICE_ATTR_RATING], call.data[SERVICE_ATTR_NOTE]
+            place_id,
+            call.data[SERVICE_ATTR_RATING],
+            note=call.data[SERVICE_ATTR_NOTE],
+            liked=call.data[SERVICE_ATTR_LIKED],
+            disliked=call.data[SERVICE_ATTR_DISLIKED],
         )
 
     if not hass.services.has_service(DOMAIN, SERVICE_RATE_PARK):
         hass.services.async_register(
             DOMAIN, SERVICE_RATE_PARK, _async_handle_rate_park, schema=RATE_PARK_SCHEMA
         )
+
+    # Views are global rather than per-entry, and HA raises if the same view
+    # name is registered twice (e.g. after a reload), so guard with a flag.
+    if not hass.data[DOMAIN].get("_views_registered"):
+        async_register_views(hass)
+        hass.data[DOMAIN]["_views_registered"] = True
 
     return True
 
@@ -84,7 +99,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
-        if not hass.data[DOMAIN]:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+        # hass.data[DOMAIN] also holds the _views_registered flag, so emptiness
+        # can't be used to detect "last entry gone" — count real entries.
+        # (Views themselves can't be unregistered from HA's HTTP app, so the
+        # flag deliberately survives a reload.)
+        if not any(isinstance(v, dict) and "coordinator" in v for v in hass.data[DOMAIN].values()):
             hass.services.async_remove(DOMAIN, SERVICE_RATE_PARK)
     return unload_ok
