@@ -10,6 +10,11 @@ DEFAULT_LONGITUDE = 153.2138
 
 DEFAULT_RADIUS_KM = 100
 DEFAULT_MAX_PARKS = 100
+
+# Parks with only a handful of Google ratings aren't meaningfully "top rated"
+# — a lone 5.0 review would otherwise outrank a genuinely popular park. Places
+# below this many ratings are left out of the list entirely.
+MIN_RATING_COUNT = 5
 MIN_RADIUS_KM = 1
 MAX_RADIUS_KM = 300
 MIN_MAX_PARKS = 1

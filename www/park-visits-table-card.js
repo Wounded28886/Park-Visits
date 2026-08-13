@@ -939,13 +939,14 @@ const STYLES = `
     color: var(--primary-text-color, #eee);
   }
   .pv-danger { background: var(--error-color, #f44336); margin-left: auto; }
+  /* Matches .pv-btn (the "Write a review" button) so the two entry points
+     into the review form look like the same action. */
   .pv-rowbtn {
-    padding: 4px 12px; border: 1px solid var(--divider-color, #333); border-radius: 6px;
-    background: var(--secondary-background-color, #2a2a2a);
-    color: var(--primary-text-color, #eee); cursor: pointer; font: inherit; font-size: 13px;
-    white-space: nowrap;
+    padding: 5px 14px; border: none; border-radius: 6px;
+    background: var(--primary-color, #03a9f4); color: var(--text-primary-color, #fff);
+    cursor: pointer; font: inherit; font-size: 13px; white-space: nowrap;
   }
-  .pv-rowbtn:hover { border-color: var(--primary-color, #03a9f4); color: var(--primary-color, #03a9f4); }
+  .pv-rowbtn:hover { filter: brightness(1.1); }
   .pv-nosort { cursor: default; }
   .pv-photo-wrap { position: relative; flex: 0 0 auto; }
   .pv-photo-del {
