@@ -15,7 +15,9 @@ review — rating, what you liked, what you didn't, notes and photos.
   centre point, tiling several 50km-radius requests to cover radii bigger
   than Google's single-request cap.
 - Ranks results by **Google's average rating** (rating count breaks ties),
-  keeping the configured number of top parks.
+  keeping the configured number of top parks. Places with fewer than **5
+  Google ratings** are excluded, so a lone 5.0 review can't outrank a
+  genuinely popular park (`MIN_RATING_COUNT` in `const.py`).
 - Each park keeps **all** of the categories/types Google reports for it
   (e.g. a place can be both a "Park" and a "Tourist Attraction"), not a
   single fixed category.

@@ -36,6 +36,7 @@ from .const import (
     DEFAULT_MAX_PARKS,
     DEFAULT_RADIUS_KM,
     DOMAIN,
+    MIN_RATING_COUNT,
     PLACES_API_BASE_URL,
     PLACES_API_FIELD_MASK,
     PLACES_API_INCLUDED_TYPES,
@@ -149,6 +150,19 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
             # Cache written by a version with different fields — ignore it and
             # let a real fetch rebuild it.
             return False
+
+        # A cache written before the minimum-rating rule existed can still
+        # hold thinly-rated parks. Re-apply the filter here so the rule takes
+        # effect immediately rather than waiting for a (paid) refresh, and
+        # renumber so the ranks stay contiguous.
+        filtered = [p for p in parks if (p.rating_count or 0) >= MIN_RATING_COUNT]
+        if len(filtered) != len(parks):
+            for index, park in enumerate(filtered, start=1):
+                park.rank = index
+        parks = filtered
+        if not parks:
+            return False
+
         self.async_set_updated_data(parks)
         await self.async_refresh_reviews()
         return True
@@ -247,9 +261,14 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
                 }
             )
 
-        # Rank by Google rating (best first); unrated places sort last. Rating
-        # count breaks ties so a 5.0 from 2 reviews doesn't outrank a 4.9 from
-        # 2,000.
+        # Thinly-rated places are dropped before ranking, not after, so the
+        # configured park count is filled with parks that actually qualify.
+        candidates = [
+            p for p in candidates if (p["rating_count"] or 0) >= MIN_RATING_COUNT
+        ]
+
+        # Rank by Google rating (best first). Rating count breaks ties so a
+        # 5.0 from 6 reviews doesn't outrank a 4.9 from 2,000.
         candidates.sort(
             key=lambda p: (p["rating"] is None, -(p["rating"] or 0), -p["rating_count"])
         )
