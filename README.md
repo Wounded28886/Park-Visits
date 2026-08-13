@@ -25,12 +25,16 @@ review — rating, what you liked, what you didn't, notes and photos.
   - One **`geo_location`** entity per tracked park, carrying rank,
     categories, address, Google rating/count, a Google Maps link, and our
     own review summary.
-  - One summary **sensor** (`sensor.nearby_parks`) reporting how many parks
-    are currently tracked.
+  - Three summary **sensors**: `sensor.nearby_parks` (how many parks are
+    tracked), `sensor.next_park` (the park we plan to visit next) and
+    `sensor.last_visited_park` (the most recently reviewed park). The last
+    two are usable in automations — "remind us about the next park on
+    Saturday morning", say.
   - A **"Refresh parks" button** — see [Refresh cost](#refresh-cost-and-cadence).
-- Registers services to record and remove reviews: **`rate_park`** (rating,
+- Registers services to record and remove reviews — **`rate_park`** (rating,
   liked, disliked, notes), **`delete_review`** (also deletes that review's
-  photo files) and **`delete_photo`** (one photo). Reviews are stored locally
+  photo files) and **`delete_photo`** (one photo) — plus
+  **`set_next_park`** / **`clear_next_park`** for planning the next visit. Reviews are stored locally
   (`.storage`, keyed by Google's place_id) and survive dataset refreshes —
   including a park dropping out of the tracked list, since the park's name is
   saved with the review.

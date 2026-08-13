@@ -44,7 +44,7 @@ from .const import (
     PLACES_API_MAX_TILE_RADIUS_KM,
     PLACES_API_NOISE_TYPES,
 )
-from .storage import ParkListCache, ParkReviewStore
+from .storage import ParkListCache, ParkPlanStore, ParkReviewStore
 from .util import destination_point, haversine_km
 
 _LOGGER = logging.getLogger(__name__)
@@ -111,6 +111,7 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         entry: ConfigEntry,
         reviews: ParkReviewStore,
         park_cache: ParkListCache,
+        plan: ParkPlanStore,
     ) -> None:
         super().__init__(
             hass,
@@ -121,6 +122,7 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         self.entry = entry
         self.reviews = reviews
         self.park_cache = park_cache
+        self.plan = plan
 
     def settings_fingerprint(self) -> str:
         """Identifies the search parameters a cached park list was fetched with."""
@@ -294,6 +296,73 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
             return ""
         return next((p.name for p in self.data if p.place_id == place_id), "")
 
+    def park_by_id(self, place_id: str) -> RankedPark | None:
+        """The tracked park with this place_id, if it's still in the list."""
+        if not self.data:
+            return None
+        return next((p for p in self.data if p.place_id == place_id), None)
+
+    def next_park(self) -> dict[str, Any] | None:
+        """The park we've planned to visit next, enriched with live details."""
+        planned = self.plan.next_park
+        if not planned:
+            return None
+        park = self.park_by_id(planned["place_id"])
+        if park:
+            planned.update(
+                {
+                    "park_name": park.name,
+                    "rating": park.rating,
+                    "rating_count": park.rating_count,
+                    "distance_km": park.distance_km,
+                    "categories": park.categories,
+                    "address": park.address,
+                    "still_tracked": True,
+                }
+            )
+        else:
+            planned["still_tracked"] = False
+        return planned
+
+    def last_visited(self) -> dict[str, Any] | None:
+        """The most recently reviewed park — writing a review is the record of a visit.
+
+        Read from the review store rather than the tracked list so a park that
+        has since dropped out of the top N is still reported.
+        """
+        latest_id = None
+        latest = None
+        for place_id, review in self.reviews.all_reviews().items():
+            if not review.reviewed_at:
+                continue
+            if latest is None or review.reviewed_at > latest.reviewed_at:
+                latest, latest_id = review, place_id
+        if latest is None:
+            return None
+
+        park = self.park_by_id(latest_id)
+        return {
+            "place_id": latest_id,
+            "park_name": (park.name if park else "") or latest.park_name or "Unknown park",
+            "our_rating": latest.rating,
+            "our_liked": latest.liked,
+            "our_disliked": latest.disliked,
+            "our_note": latest.note,
+            "our_photo_count": len(latest.photos),
+            "reviewed_at": latest.reviewed_at,
+            "rating": park.rating if park else None,
+            "distance_km": park.distance_km if park else None,
+            "still_tracked": park is not None,
+        }
+
+    async def async_set_next_park(self, place_id: str) -> None:
+        await self.plan.async_set_next(place_id, self.park_name(place_id))
+        self.async_update_listeners()
+
+    async def async_clear_next_park(self) -> None:
+        await self.plan.async_clear_next()
+        self.async_update_listeners()
+
     async def async_submit_review(
         self,
         place_id: str,
@@ -311,6 +380,12 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
             note=note,
             park_name=self.park_name(place_id),
         )
+        # Reviewing the park that was queued up means we've been — so it stops
+        # being "next". Leaving it there would show a park as both the last
+        # visited and the next to visit.
+        planned = self.plan.next_park
+        if planned and planned.get("place_id") == place_id:
+            await self.plan.async_clear_next()
         await self.async_refresh_reviews()
 
     async def async_delete_review(self, place_id: str) -> list[str]:

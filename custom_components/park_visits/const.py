@@ -46,6 +46,8 @@ ATTR_OUR_REVIEWED_AT = "our_reviewed_at"
 SERVICE_RATE_PARK = "rate_park"
 SERVICE_DELETE_REVIEW = "delete_review"
 SERVICE_DELETE_PHOTO = "delete_photo"
+SERVICE_SET_NEXT_PARK = "set_next_park"
+SERVICE_CLEAR_NEXT_PARK = "clear_next_park"
 SERVICE_ATTR_FILENAME = "filename"
 SERVICE_ATTR_PLACE_ID = "place_id"
 SERVICE_ATTR_RATING = "rating"
@@ -75,8 +77,16 @@ URL_GOOGLE_PHOTO = "/api/park_visits/google_photo/{place_id}/{index}"
 URL_OUR_PHOTO = "/api/park_visits/photo/{place_id}/{filename}"
 URL_UPLOAD = "/api/park_visits/upload/{place_id}"
 
+# Cards locate these sensors by attribute rather than entity_id, which Home
+# Assistant may suffix or a user may rename.
+ATTR_ROLE = "park_visits_role"
+ROLE_NEXT_PARK = "next_park"
+ROLE_LAST_VISITED = "last_visited"
+ATTR_SET_AT = "set_at"
+
 STORAGE_VERSION = 1
 STORAGE_KEY_TEMPLATE = f"{DOMAIN}_reviews_{{entry_id}}"
+PLAN_KEY_TEMPLATE = f"{DOMAIN}_plan_{{entry_id}}"
 # The fetched park list is cached to disk so a Home Assistant restart doesn't
 # silently spend a full (paid) Google search just to repopulate entities.
 PARKS_CACHE_KEY_TEMPLATE = f"{DOMAIN}_parks_{{entry_id}}"
