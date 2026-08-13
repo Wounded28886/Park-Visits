@@ -69,6 +69,9 @@ URL_UPLOAD = "/api/park_visits/upload/{place_id}"
 
 STORAGE_VERSION = 1
 STORAGE_KEY_TEMPLATE = f"{DOMAIN}_reviews_{{entry_id}}"
+# The fetched park list is cached to disk so a Home Assistant restart doesn't
+# silently spend a full (paid) Google search just to repopulate entities.
+PARKS_CACHE_KEY_TEMPLATE = f"{DOMAIN}_parks_{{entry_id}}"
 
 # Google Places API (New)
 PLACES_API_BASE_URL = "https://places.googleapis.com/v1/places:searchNearby"

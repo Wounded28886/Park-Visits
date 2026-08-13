@@ -26,7 +26,7 @@ from .const import (
     SERVICE_RATE_PARK,
 )
 from .coordinator import ParkVisitsCoordinator
-from .storage import ParkReviewStore
+from .storage import ParkListCache, ParkReviewStore
 from .views import async_register_views
 
 PLATFORMS = ["geo_location", "sensor", "button"]
@@ -49,8 +49,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     reviews = ParkReviewStore(hass, entry.entry_id)
     await reviews.async_load()
 
-    coordinator = ParkVisitsCoordinator(hass, entry, reviews)
-    await coordinator.async_config_entry_first_refresh()
+    park_cache = ParkListCache(hass, entry.entry_id)
+    coordinator = ParkVisitsCoordinator(hass, entry, reviews, park_cache)
+
+    # Restoring the previous park list keeps a restart free: Google is only
+    # contacted when there's nothing cached for the current settings (first
+    # setup, or after the centre point/radius/count changed).
+    if not await coordinator.async_load_cached():
+        await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "coordinator": coordinator,

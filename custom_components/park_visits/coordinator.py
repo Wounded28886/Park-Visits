@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 
 import aiohttp
@@ -43,7 +43,7 @@ from .const import (
     PLACES_API_MAX_TILE_RADIUS_KM,
     PLACES_API_NOISE_TYPES,
 )
-from .storage import ParkReviewStore
+from .storage import ParkListCache, ParkReviewStore
 from .util import destination_point, haversine_km
 
 _LOGGER = logging.getLogger(__name__)
@@ -105,7 +105,11 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
     """Fetches nearby parks from Google Places and ranks them by rating."""
 
     def __init__(
-        self, hass: HomeAssistant, entry: ConfigEntry, reviews: ParkReviewStore
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        reviews: ParkReviewStore,
+        park_cache: ParkListCache,
     ) -> None:
         super().__init__(
             hass,
@@ -115,6 +119,39 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         )
         self.entry = entry
         self.reviews = reviews
+        self.park_cache = park_cache
+
+    def settings_fingerprint(self) -> str:
+        """Identifies the search parameters a cached park list was fetched with."""
+        o = self.entry.options
+        return "|".join(
+            str(o.get(k, d))
+            for k, d in (
+                (CONF_LATITUDE, DEFAULT_LATITUDE),
+                (CONF_LONGITUDE, DEFAULT_LONGITUDE),
+                (CONF_RADIUS_KM, DEFAULT_RADIUS_KM),
+                (CONF_MAX_PARKS, DEFAULT_MAX_PARKS),
+            )
+        )
+
+    async def async_load_cached(self) -> bool:
+        """Populate from the on-disk park list instead of calling Google.
+
+        Returns True when the cache was usable, so setup can skip the initial
+        (paid) refresh entirely.
+        """
+        cached = await self.park_cache.async_load(self.settings_fingerprint())
+        if not cached:
+            return False
+        try:
+            parks = [RankedPark(**item) for item in cached]
+        except TypeError:
+            # Cache written by a version with different fields — ignore it and
+            # let a real fetch rebuild it.
+            return False
+        self.async_set_updated_data(parks)
+        await self.async_refresh_reviews()
+        return True
 
     async def _async_update_data(self) -> list[RankedPark]:
         options = self.entry.options
@@ -225,6 +262,11 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
             seen_ids[park["place_id"]] = count + 1
             unique_id = park["place_id"] if count == 0 else f"{park['place_id']}_{count}"
             result.append(RankedPark(rank=display_rank, unique_id=unique_id, **park))
+
+        # Persist so the next restart doesn't re-run this (paid) search.
+        await self.park_cache.async_save(
+            self.settings_fingerprint(), [asdict(p) for p in result]
+        )
         return result
 
     async def async_submit_review(
