@@ -4,10 +4,6 @@ from __future__ import annotations
 DOMAIN = "park_visits"
 DEFAULT_NAME = "Park Visits"
 
-# Cornubia, City of Logan, Queensland, Australia
-DEFAULT_LATITUDE = -27.6599
-DEFAULT_LONGITUDE = 153.2138
-
 DEFAULT_RADIUS_KM = 100
 DEFAULT_MAX_PARKS = 100
 
@@ -21,6 +17,11 @@ MIN_MAX_PARKS = 1
 MAX_MAX_PARKS = 200
 
 CONF_API_KEY = "api_key"
+# Free text entered by the user (a suburb, city or address) — resolved to
+# CONF_LOCATION_NAME + latitude/longitude via Google Places Text Search
+# during the config/options flow, not typed in as coordinates.
+CONF_LOCATION = "location"
+CONF_LOCATION_NAME = "location_name"
 CONF_RADIUS_KM = "radius_km"
 CONF_MAX_PARKS = "max_parks"
 
@@ -138,3 +139,8 @@ PLACES_API_NOISE_TYPES = {"point_of_interest", "establishment"}
 # Google's Nearby Search hard caps the search radius at 50km per request.
 PLACES_API_MAX_TILE_RADIUS_KM = 50
 PLACES_API_MAX_RESULTS_PER_TILE = 20
+
+# Resolves a free-text location (a suburb, city or address) to coordinates,
+# used only during the config/options flow — not on every refresh.
+GEOCODE_API_URL = "https://places.googleapis.com/v1/places:searchText"
+GEOCODE_FIELD_MASK = "places.location,places.formattedAddress,places.displayName"

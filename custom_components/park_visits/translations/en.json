@@ -3,18 +3,21 @@
     "step": {
       "user": {
         "title": "Set up Park Visits",
-        "description": "Enter your Google Places API key and choose the centre point and search radius. Defaults to Cornubia, QLD.",
+        "description": "Enter your Google Places API key and a place to search around — a suburb, city or street address. It's resolved to a location automatically, so no coordinates needed.",
         "data": {
           "api_key": "Google Places API key",
-          "latitude": "Centre latitude",
-          "longitude": "Centre longitude",
+          "location": "Location (suburb, city or address)",
           "radius_km": "Radius (km)",
           "max_parks": "Number of parks to show"
         }
       }
     },
     "error": {
-      "api_key_required": "A Google Places API key is required."
+      "api_key_required": "A Google Places API key is required.",
+      "location_required": "Enter a suburb, city or address to search around.",
+      "location_not_found": "Couldn't find that location — try a more specific suburb, city or address.",
+      "invalid_api_key": "Google rejected the API key.",
+      "cannot_connect": "Couldn't reach Google to resolve that location. Try again."
     },
     "abort": {
       "already_configured": "Park Visits is already configured."
@@ -24,18 +27,21 @@
     "step": {
       "init": {
         "title": "Park Visits options",
-        "description": "Adjust the API key, centre point, radius or number of parks shown.",
+        "description": "Adjust the API key, search location, radius or number of parks shown.",
         "data": {
           "api_key": "Google Places API key",
-          "latitude": "Centre latitude",
-          "longitude": "Centre longitude",
+          "location": "Location (suburb, city or address)",
           "radius_km": "Radius (km)",
           "max_parks": "Number of parks to show"
         }
       }
     },
     "error": {
-      "api_key_required": "A Google Places API key is required."
+      "api_key_required": "A Google Places API key is required.",
+      "location_required": "Enter a suburb, city or address to search around.",
+      "location_not_found": "Couldn't find that location — try a more specific suburb, city or address.",
+      "invalid_api_key": "Google rejected the API key.",
+      "cannot_connect": "Couldn't reach Google to resolve that location. Try again."
     }
   }
 }

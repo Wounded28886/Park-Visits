@@ -17,6 +17,7 @@ from .const import (
     ATTR_ROLE,
     ATTR_SET_AT,
     ATTRIBUTION,
+    CONF_LOCATION_NAME,
     CONF_MAX_PARKS,
     CONF_RADIUS_KM,
     DOMAIN,
@@ -68,6 +69,7 @@ class ParkCountSensor(CoordinatorEntity[ParkVisitsCoordinator], SensorEntity):
     def extra_state_attributes(self) -> dict[str, object]:
         options = self._entry.options
         return {
+            CONF_LOCATION_NAME: options.get(CONF_LOCATION_NAME),
             CONF_LATITUDE: options.get(CONF_LATITUDE),
             CONF_LONGITUDE: options.get(CONF_LONGITUDE),
             CONF_RADIUS_KM: options.get(CONF_RADIUS_KM),

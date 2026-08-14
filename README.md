@@ -1,9 +1,9 @@
 # Park Visits
 
 A Home Assistant custom integration that tracks the top-rated parks within a
-configurable radius of a configurable centre point — defaults to
-**Cornubia, City of Logan, Queensland, Australia** (-27.6599, 153.2138) and a
-**100 km** radius — using the **Google Places API**, ranked by Google rating.
+configurable radius of a location **you type in** during setup — a suburb,
+city or street address, resolved automatically to a point on the map — using
+the **Google Places API**, ranked by Google rating.
 
 The dashboard is a sortable table: click a column to sort by it, click a park
 to open its detail panel with Google's photos and reviews, and write your own
@@ -11,7 +11,10 @@ review — rating, what you liked, what you didn't, notes and photos.
 
 ## What it does
 
-- Queries the **Google Places API (New)** for parks around your configured
+- During setup, resolves the suburb/city/address you type into coordinates
+  via Google Places **Text Search** — no separate Geocoding API needed, and
+  no latitude/longitude to look up yourself.
+- Queries the **Google Places API (New)** for parks around that resolved
   centre point, tiling several 50km-radius requests to cover radii bigger
   than Google's single-request cap.
 - Ranks results by **Google's average rating** (rating count breaks ties),
@@ -96,11 +99,14 @@ save.
 
 1. **Settings > Devices & Services > Add Integration**, search for
    **Park Visits**.
-2. Paste your Google Places API key, and accept the defaults (Cornubia,
-   100 km, top 100) or adjust the centre latitude/longitude, radius and
-   number of parks to show.
-3. You can change these later via the integration's **Configure** button —
-   this triggers a reload and regenerates the tracked parks.
+2. Paste your Google Places API key, type in a **location** to search
+   around — a suburb, city or street address (e.g. "Cornubia QLD" or
+   "123 Example St, Brisbane") — and set the radius (default 100 km) and
+   number of parks to show (default top 100). The location is resolved to
+   coordinates automatically; if it can't be found, the form shows an error
+   so you can try a more specific location.
+3. You can change any of this later via the integration's **Configure**
+   button — this triggers a reload and regenerates the tracked parks.
 
 ### 4. Install the custom card
 
@@ -133,8 +139,8 @@ There is **no automatic polling**. Google is contacted only when:
 
 | Action | Cost |
 |---|---|
-| Adding the integration for the first time | One full park search |
-| Changing centre point, radius or park count | One full park search |
+| Adding the integration for the first time | One location lookup + one full park search |
+| Changing the location, radius or park count | One location lookup + one full park search |
 | Pressing **Refresh parks** | One full park search |
 | Opening a park for the first time in 24h | One Place Details call |
 | Viewing a park's Google photos | One photo fetch each |
@@ -163,10 +169,11 @@ custom_components/park_visits/
 ├── manifest.json       # HA integration manifest
 ├── const.py            # domain, defaults, Google Places config, attribute keys
 ├── util.py             # haversine distance + geodesic tile-centre calculation
+├── geocoding.py         # resolves a typed suburb/city/address to coordinates
 ├── coordinator.py      # tiled Google Places queries, ranking, review merging
 ├── storage.py          # persistent local reviews (place_id -> rating/liked/photos)
 ├── views.py            # HTTP: Place Details, photo proxy, photo upload/serve
-├── config_flow.py      # setup + options UI (API key, centre point, radius, count)
+├── config_flow.py      # setup + options UI (API key, location, radius, count)
 ├── geo_location.py     # one GeolocationEvent entity per tracked park
 ├── sensor.py           # summary "Nearby Parks" count sensor
 ├── button.py           # manual "Refresh parks" button — the only API trigger

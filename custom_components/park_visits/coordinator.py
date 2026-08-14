@@ -31,8 +31,6 @@ from .const import (
     CONF_API_KEY,
     CONF_MAX_PARKS,
     CONF_RADIUS_KM,
-    DEFAULT_LATITUDE,
-    DEFAULT_LONGITUDE,
     DEFAULT_MAX_PARKS,
     DEFAULT_RADIUS_KM,
     DOMAIN,
@@ -128,12 +126,12 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         """Identifies the search parameters a cached park list was fetched with."""
         o = self.entry.options
         return "|".join(
-            str(o.get(k, d))
-            for k, d in (
-                (CONF_LATITUDE, DEFAULT_LATITUDE),
-                (CONF_LONGITUDE, DEFAULT_LONGITUDE),
-                (CONF_RADIUS_KM, DEFAULT_RADIUS_KM),
-                (CONF_MAX_PARKS, DEFAULT_MAX_PARKS),
+            str(v)
+            for v in (
+                o.get(CONF_LATITUDE),
+                o.get(CONF_LONGITUDE),
+                o.get(CONF_RADIUS_KM, DEFAULT_RADIUS_KM),
+                o.get(CONF_MAX_PARKS, DEFAULT_MAX_PARKS),
             )
         )
 
@@ -175,8 +173,13 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         if not api_key:
             raise ConfigEntryAuthFailed("Missing Google Places API key")
 
-        center_lat = options.get(CONF_LATITUDE, DEFAULT_LATITUDE)
-        center_lon = options.get(CONF_LONGITUDE, DEFAULT_LONGITUDE)
+        center_lat = options.get(CONF_LATITUDE)
+        center_lon = options.get(CONF_LONGITUDE)
+        if center_lat is None or center_lon is None:
+            raise UpdateFailed(
+                "No location is configured for Park Visits — open its options "
+                "and choose a location"
+            )
         radius_km = options.get(CONF_RADIUS_KM, DEFAULT_RADIUS_KM)
         max_parks = options.get(CONF_MAX_PARKS, DEFAULT_MAX_PARKS)
 
