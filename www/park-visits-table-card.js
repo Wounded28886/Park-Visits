@@ -113,6 +113,8 @@ class ParkVisitsTableCard extends HTMLElement {
     this._detailsError = null;
     this._formOpen = false;
     this._busy = false;
+    this._photoItems = [];
+    this._lightboxIndex = null;
   }
 
   setConfig(config) {
@@ -573,6 +575,8 @@ class ParkVisitsTableCard extends HTMLElement {
     // The form is a separate popup that takes the place of the detail view,
     // rather than a panel appended under Google's reviews.
     this._formOpen = straightToForm;
+    this._photoItems = [];
+    this._lightboxIndex = null;
     this._renderDialog();
 
     const state = this._hass.states[entityId];
@@ -634,7 +638,40 @@ class ParkVisitsTableCard extends HTMLElement {
     this._formOpen = false;
     this._renderedSignature = null;
     this._pendingReview = null;
+    this._photoItems = [];
+    this._lightboxIndex = null;
     this.querySelector(".pv-dialog-root").innerHTML = "";
+  }
+
+  _openLightbox(index) {
+    this._lightboxIndex = index;
+    this._renderDialog();
+  }
+
+  _closeLightbox() {
+    this._lightboxIndex = null;
+    this._renderDialog();
+  }
+
+  _lightboxHtml() {
+    const items = this._photoItems || [];
+    const item = this._lightboxIndex != null ? items[this._lightboxIndex] : null;
+    if (!item) return "";
+    const many = items.length > 1;
+    return `
+      <div class="pv-lb-backdrop">
+        <div class="pv-lb-dialog" role="dialog" aria-modal="true">
+          <button class="pv-lb-close" title="Close">✕</button>
+          <img class="pv-lb-full" src="${escapeHtml(item.url)}" alt="">
+          <div class="pv-lb-nav">
+            ${many ? `<button class="pv-lb-prev">‹ Previous</button>` : ""}
+            <span class="muted">${escapeHtml(item.source)}${
+      many ? ` · ${this._lightboxIndex + 1} of ${items.length}` : ""
+    }</span>
+            ${many ? `<button class="pv-lb-next">Next ›</button>` : ""}
+          </div>
+        </div>
+      </div>`;
   }
 
   _renderDialog() {
@@ -658,13 +695,28 @@ class ParkVisitsTableCard extends HTMLElement {
     const a = this._effectiveAttributes(state);
     const d = this._details;
 
-    const googlePhotos = (this._googlePhotoUrls || [])
-      .map((u) => `<img class="pv-photo" src="${escapeHtml(u)}" loading="lazy" alt="">`)
-      .join("");
+    // Combined so a click can open one lightbox that pages through every
+    // photo shown on this park — our uploads first, then Google's, matching
+    // the order they appear in the page below.
+    this._photoItems = [
+      ...(this._ourPhotoUrls || []).map((p) => ({ url: p.url, source: "Our photo" })),
+      ...(this._googlePhotoUrls || []).map((u) => ({ url: u, source: "Google photo" })),
+    ];
+    const ourCount = (this._ourPhotoUrls || []).length;
     const ourPhotos = (this._ourPhotoUrls || [])
       .map(
-        (p) =>
-          `<img class="pv-photo" src="${escapeHtml(p.url)}" loading="lazy" alt="">`
+        (p, i) =>
+          `<img class="pv-photo pv-photo-click" data-index="${i}" src="${escapeHtml(
+            p.url
+          )}" loading="lazy" alt="">`
+      )
+      .join("");
+    const googlePhotos = (this._googlePhotoUrls || [])
+      .map(
+        (u, i) =>
+          `<img class="pv-photo pv-photo-click" data-index="${
+            ourCount + i
+          }" src="${escapeHtml(u)}" loading="lazy" alt="">`
       )
       .join("");
 
@@ -782,6 +834,7 @@ class ParkVisitsTableCard extends HTMLElement {
           <div class="pv-dialog-body">${body}</div>
         </div>
       </div>
+      ${this._lightboxHtml()}
     `;
 
     const backdrop = root.querySelector(".pv-backdrop");
@@ -813,6 +866,32 @@ class ParkVisitsTableCard extends HTMLElement {
     root.querySelector(".pv-backdrop").addEventListener("click", (ev) => {
       if (ev.target.classList.contains("pv-backdrop")) this._closeDialog();
     });
+
+    root.querySelectorAll(".pv-photo-click").forEach((img) => {
+      img.addEventListener("click", () =>
+        this._openLightbox(parseInt(img.dataset.index, 10))
+      );
+    });
+    const lbClose = root.querySelector(".pv-lb-close");
+    if (lbClose) lbClose.addEventListener("click", () => this._closeLightbox());
+    const lbBackdrop = root.querySelector(".pv-lb-backdrop");
+    if (lbBackdrop) {
+      lbBackdrop.addEventListener("click", (ev) => {
+        if (ev.target.classList.contains("pv-lb-backdrop")) this._closeLightbox();
+      });
+    }
+    const lbPrev = root.querySelector(".pv-lb-prev");
+    if (lbPrev)
+      lbPrev.addEventListener("click", () => {
+        const items = this._photoItems || [];
+        this._openLightbox((this._lightboxIndex - 1 + items.length) % items.length);
+      });
+    const lbNext = root.querySelector(".pv-lb-next");
+    if (lbNext)
+      lbNext.addEventListener("click", () => {
+        const items = this._photoItems || [];
+        this._openLightbox((this._lightboxIndex + 1) % items.length);
+      });
 
     const write = root.querySelector(".pv-write");
     if (write) {
@@ -1153,6 +1232,8 @@ const STYLES = `
     height: 130px; border-radius: 8px; object-fit: cover; flex: 0 0 auto;
     background: var(--secondary-background-color, #2a2a2a);
   }
+  .pv-photo-click { cursor: pointer; }
+  .pv-photo-click:hover { filter: brightness(1.08); }
   .pv-review { padding: 8px 0; border-bottom: 1px solid var(--divider-color, #2a2a2a); }
   .pv-review:last-child { border-bottom: none; }
   .pv-review-head { display: flex; gap: 8px; justify-content: space-between; font-size: 13px; }
@@ -1207,6 +1288,34 @@ const STYLES = `
     content: "missing"; display: flex; align-items: center; justify-content: center;
     height: 100%; font-size: 12px; opacity: 0.6;
   }
+  .pv-lb-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10000; padding: 24px 12px;
+  }
+  .pv-lb-dialog {
+    position: relative; max-width: 900px; width: 100%;
+    background: var(--card-background-color, #1c1c1c);
+    border-radius: var(--ha-card-border-radius, 12px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6); overflow: hidden;
+  }
+  .pv-lb-full { width: 100%; max-height: 78vh; object-fit: contain; background: #000; display: block; }
+  .pv-lb-close {
+    position: absolute; top: 8px; right: 8px; width: 30px; height: 30px;
+    border: none; border-radius: 50%; cursor: pointer; line-height: 1;
+    background: rgba(0,0,0,0.65); color: #fff; font-size: 15px;
+  }
+  .pv-lb-close:hover { background: var(--error-color, #f44336); }
+  .pv-lb-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 12px 16px;
+  }
+  .pv-lb-nav button {
+    padding: 6px 14px; border: 1px solid var(--divider-color, #333); border-radius: 6px;
+    background: var(--secondary-background-color, #2a2a2a);
+    color: var(--primary-text-color, #eee); cursor: pointer; font: inherit;
+  }
+  .pv-lb-nav button:hover { border-color: var(--primary-color, #03a9f4); }
 </style>`;
 
 customElements.define("park-visits-table-card", ParkVisitsTableCard);
