@@ -952,8 +952,8 @@ class ParkVisitsTableCard extends HTMLElement {
         <label>Other notes</label>
         <textarea name="note" rows="3">${escapeHtml(a.our_note || "")}</textarea>
         ${existing ? `<label>Photos</label><div class="pv-photos">${existing}</div>` : ""}
-        <label>Add a photo</label>
-        <input type="file" name="photo" accept="image/*">
+        <label>Add photos</label>
+        <input type="file" name="photo" accept="image/*" multiple>
         <div class="pv-form-actions">
           <button type="submit" class="pv-btn">Save review</button>
           <button type="button" class="pv-btn pv-secondary pv-cancel">Cancel</button>
@@ -1067,10 +1067,31 @@ class ParkVisitsTableCard extends HTMLElement {
           },
         };
 
-        const file = form.photo.files && form.photo.files[0];
-        if (file) {
-          status.textContent = "Uploading photo…";
-          await this._uploadPhoto(placeId, file);
+        const files = form.photo.files ? Array.from(form.photo.files) : [];
+        const failedUploads = [];
+        for (let i = 0; i < files.length; i++) {
+          status.textContent =
+            files.length > 1
+              ? `Uploading photo ${i + 1} of ${files.length}…`
+              : "Uploading photo…";
+          try {
+            await this._uploadPhoto(placeId, files[i]);
+          } catch (err) {
+            failedUploads.push(files[i].name);
+          }
+        }
+        if (failedUploads.length) {
+          // The review itself (and any photos before the failure) are
+          // already saved — leave the form open with a clear status rather
+          // than routing through the generic "Couldn't save" catch below,
+          // which would wrongly imply nothing was saved.
+          const err = new Error(
+            `Review saved, but ${failedUploads.length} photo${
+              failedUploads.length === 1 ? "" : "s"
+            } failed to upload: ${failedUploads.join(", ")}`
+          );
+          err.reviewAlreadySaved = true;
+          throw err;
         }
 
         status.textContent = "Saved ✓";
@@ -1079,7 +1100,8 @@ class ParkVisitsTableCard extends HTMLElement {
         await this._reloadDetails(placeId);
         this._renderDialog();
       } catch (err) {
-        status.textContent = `Couldn't save: ${err && err.message ? err.message : err}`;
+        const message = err && err.message ? err.message : err;
+        status.textContent = err && err.reviewAlreadySaved ? message : `Couldn't save: ${message}`;
         status.classList.add("err");
       } finally {
         this._busy = false;
