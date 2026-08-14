@@ -60,6 +60,7 @@ views:
           - type: custom:park-visits-table-card
             title: Visited parks
             source: park_visits
+            show_status_strip: false
             show_progress: true
             only_visited: true
             default_sort: our_visit_date

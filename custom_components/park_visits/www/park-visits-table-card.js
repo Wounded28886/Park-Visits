@@ -21,6 +21,7 @@
  *   show_filter: true
  *   only_visited: false       # true = only rows with a visit date
  *   show_progress: false      # true = "X / Y visited" bar above the table
+ *   show_status_strip: true   # false = hide the "Last visited / Next up" strip
  *   columns:                  # optional; omit for the default set below
  *     - rank
  *     - name
@@ -200,6 +201,7 @@ class ParkVisitsTableCard extends HTMLElement {
       show_filter: true,
       only_visited: false,
       show_progress: false,
+      show_status_strip: true,
       ...config,
     };
     const keys =
@@ -553,7 +555,7 @@ class ParkVisitsTableCard extends HTMLElement {
     this.innerHTML = `
       <ha-card header="${escapeHtml(this.config.title)}">
         <div class="card-content">
-          <div class="pv-status-strip"></div>
+          ${this.config.show_status_strip ? `<div class="pv-status-strip"></div>` : ""}
           ${this.config.show_progress ? `<div class="pv-progress"></div>` : ""}
           ${
             this.config.show_filter
