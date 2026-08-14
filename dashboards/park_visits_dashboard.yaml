@@ -47,6 +47,43 @@ views:
             grid_options:
               columns: full
 
+  - title: Visited
+    path: visited
+    type: sections
+    icon: mdi:map-check
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Parks we've visited
+            icon: mdi:check-circle
+          - type: custom:park-visits-table-card
+            title: Visited parks
+            source: park_visits
+            show_progress: true
+            only_visited: true
+            default_sort: our_visit_date
+            default_direction: desc
+            show_filter: true
+            columns:
+              - rank
+              - name
+              - our_visit_date
+              - our_overall_rating
+              - our_kids_rating
+              - our_mums_rating
+              - our_dads_rating
+              - our_playground_rating
+              - our_scenery_rating
+              - our_wildlife_rating
+              - our_facilities_rating
+              - our_parking_rating
+              - distance
+              - review
+            grid_options:
+              columns: full
+              rows: auto
+
   - title: Gallery
     path: gallery
     type: sections

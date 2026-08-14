@@ -29,6 +29,7 @@ from .coordinator import ParkVisitsCoordinator
 ICON = "mdi:pine-tree"
 ICON_NEXT = "mdi:map-marker-right"
 ICON_LAST = "mdi:history"
+ICON_VISITED = "mdi:map-check"
 
 NONE_SELECTED = "None selected"
 NONE_VISITED = "No visits yet"
@@ -44,6 +45,7 @@ async def async_setup_entry(
             ParkCountSensor(coordinator, entry),
             NextParkSensor(coordinator, entry),
             LastVisitedParkSensor(coordinator, entry),
+            VisitedCountSensor(coordinator, entry),
         ]
     )
 
@@ -132,13 +134,47 @@ class LastVisitedParkSensor(CoordinatorEntity[ParkVisitsCoordinator], SensorEnti
         return {
             ATTR_ROLE: ROLE_LAST_VISITED,
             "place_id": visited.get("place_id"),
-            "our_rating": visited.get("our_rating"),
+            "our_overall_rating": visited.get("our_overall_rating"),
+            "our_kids_rating": visited.get("our_kids_rating"),
+            "our_mums_rating": visited.get("our_mums_rating"),
+            "our_dads_rating": visited.get("our_dads_rating"),
             "our_liked": visited.get("our_liked", ""),
             "our_disliked": visited.get("our_disliked", ""),
             "our_note": visited.get("our_note", ""),
             "our_photo_count": visited.get("our_photo_count", 0),
-            "reviewed_at": visited.get("reviewed_at"),
+            "visit_date": visited.get("visit_date"),
             "rating": visited.get("rating"),
             "distance_km": visited.get("distance_km"),
             "still_tracked": visited.get("still_tracked"),
+        }
+
+
+class VisitedCountSensor(CoordinatorEntity[ParkVisitsCoordinator], SensorEntity):
+    """How many of the currently tracked parks we've actually visited.
+
+    "Visited" means a review with a kids_rating was submitted (a stub
+    review created purely by an early photo upload doesn't count — same
+    rule the table card uses to decide "Review" vs "Edit").
+    """
+
+    _attr_attribution = ATTRIBUTION
+    _attr_icon = ICON_VISITED
+    _attr_native_unit_of_measurement = "parks"
+    _attr_name = "Parks Visited"
+
+    def __init__(self, coordinator: ParkVisitsCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_visited_count"
+
+    @property
+    def native_value(self) -> int:
+        return sum(1 for p in self.coordinator.data if p.our_visit_date)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        total = len(self.coordinator.data)
+        visited = self.native_value
+        return {
+            "total": total,
+            "percent": round((visited / total) * 100, 1) if total else 0,
         }

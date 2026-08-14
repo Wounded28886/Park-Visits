@@ -432,16 +432,19 @@ class GalleryView(HomeAssistantView):
                 {
                     "place_id": place_id,
                     "name": live_names.get(place_id) or review.park_name or "Unknown park",
-                    "rating": review.rating if review.reviewed_at else None,
+                    "overall_rating": review.overall_rating,
+                    "kids_rating": review.kids_rating,
+                    "mums_rating": review.mums_rating,
+                    "dads_rating": review.dads_rating,
                     "liked": review.liked,
                     "disliked": review.disliked,
                     "note": review.note,
-                    "reviewed_at": review.reviewed_at or None,
+                    "visit_date": review.visit_date or None,
                     "photos": list(review.photos),
                     "still_tracked": place_id in live_names,
                 }
             )
-        items.sort(key=lambda i: i["reviewed_at"] or "", reverse=True)
+        items.sort(key=lambda i: i["visit_date"] or "", reverse=True)
         return self.json({"parks": items})
 
 

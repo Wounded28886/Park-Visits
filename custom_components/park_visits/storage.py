@@ -33,31 +33,76 @@ class Review:
     ``park_name`` is denormalised deliberately: a park can drop out of the
     tracked list (rating shifts, radius changes) while its review and photos
     live on, and the gallery still needs something to label them with.
+
+    Ratings are per family member/aspect rather than one blended number:
+    ``kids_rating`` is the only one that's required (it's the closest thing
+    to a headline rating), everything else is optional. ``overall_rating``
+    is deliberately not a stored field — it's the average of
+    kids/mums/dads, computed fresh so it can never drift out of sync with
+    the values it's derived from.
     """
 
-    rating: float
+    kids_rating: float | None = None
+    mums_rating: float | None = None
+    dads_rating: float | None = None
+    playground_rating: float | None = None
+    scenery_rating: float | None = None
+    wildlife_rating: float | None = None
+    facilities_rating: float | None = None
+    parking_rating: float | None = None
     liked: str = ""
     disliked: str = ""
     note: str = ""
     photos: list[str] = field(default_factory=list)
-    reviewed_at: str = ""
+    # ISO date "YYYY-MM-DD" the visit actually happened, chosen by whoever
+    # wrote the review (defaults to today client-side, but can be back-dated).
+    # Empty string means "not reviewed yet" (e.g. a stub created by an
+    # early photo upload before the rating form was submitted).
+    visit_date: str = ""
     park_name: str = ""
+
+    @property
+    def overall_rating(self) -> float | None:
+        """Family average of kids/mums/dads ratings, or None if none are set."""
+        values = [v for v in (self.kids_rating, self.mums_rating, self.dads_rating) if v is not None]
+        if not values:
+            return None
+        return round(sum(values) / len(values), 2)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Review:
         """Build from stored JSON, tolerating records written by older versions.
 
-        v1 reviews only had rating/note/reviewed_at. Reading them with
-        cls(**data) would work, but any future field added here would break
-        old records, so pull fields explicitly and default what's missing.
+        Pre-1.2 reviews had a single ``rating`` (0-10) and a full ISO
+        ``reviewed_at`` timestamp instead of per-person ratings and a plain
+        visit date. ``rating`` becomes the seed for ``kids_rating`` (the
+        closest existing signal to a family rating) and the date portion of
+        ``reviewed_at`` seeds ``visit_date`` — everything else
+        (mums/dads/playground/scenery/wildlife/facilities/parking) starts
+        blank until edited.
         """
+        if "kids_rating" in data or "visit_date" in data:
+            kids_rating = data.get("kids_rating")
+            visit_date = data.get("visit_date", "")
+        else:
+            kids_rating = data.get("rating")
+            legacy_reviewed_at = data.get("reviewed_at") or ""
+            visit_date = legacy_reviewed_at[:10] if legacy_reviewed_at else ""
+
         return cls(
-            rating=data.get("rating", 0),
+            kids_rating=kids_rating,
+            mums_rating=data.get("mums_rating"),
+            dads_rating=data.get("dads_rating"),
+            playground_rating=data.get("playground_rating"),
+            scenery_rating=data.get("scenery_rating"),
+            wildlife_rating=data.get("wildlife_rating"),
+            facilities_rating=data.get("facilities_rating"),
+            parking_rating=data.get("parking_rating"),
             liked=data.get("liked", ""),
             disliked=data.get("disliked", ""),
             note=data.get("note", ""),
             photos=list(data.get("photos", [])),
-            reviewed_at=data.get("reviewed_at", ""),
+            visit_date=visit_date,
             park_name=data.get("park_name", ""),
         )
 
@@ -90,7 +135,15 @@ class ParkReviewStore:
     async def async_set_review(
         self,
         place_id: str,
-        rating: float,
+        kids_rating: float,
+        visit_date: str,
+        mums_rating: float | None = None,
+        dads_rating: float | None = None,
+        playground_rating: float | None = None,
+        scenery_rating: float | None = None,
+        wildlife_rating: float | None = None,
+        facilities_rating: float | None = None,
+        parking_rating: float | None = None,
         liked: str = "",
         disliked: str = "",
         note: str = "",
@@ -100,17 +153,24 @@ class ParkReviewStore:
         """Record (or overwrite) a review for a park and persist it.
 
         Photos default to whatever is already stored rather than being
-        cleared, so editing a rating from a form that didn't re-upload the
+        cleared, so editing a review from a form that didn't re-upload the
         images doesn't silently drop them.
         """
         existing = self._reviews.get(place_id)
         review = Review(
-            rating=rating,
+            kids_rating=kids_rating,
+            mums_rating=mums_rating,
+            dads_rating=dads_rating,
+            playground_rating=playground_rating,
+            scenery_rating=scenery_rating,
+            wildlife_rating=wildlife_rating,
+            facilities_rating=facilities_rating,
+            parking_rating=parking_rating,
             liked=liked,
             disliked=disliked,
             note=note,
             photos=list(photos) if photos is not None else (existing.photos if existing else []),
-            reviewed_at=datetime.now(timezone.utc).isoformat(),
+            visit_date=visit_date,
             park_name=park_name or (existing.park_name if existing else ""),
         )
         self._reviews[place_id] = review
@@ -139,7 +199,7 @@ class ParkReviewStore:
         """
         review = self._reviews.get(place_id)
         if review is None:
-            review = Review(rating=0, reviewed_at="", park_name=park_name)
+            review = Review(park_name=park_name)
             self._reviews[place_id] = review
         elif park_name and not review.park_name:
             review.park_name = park_name

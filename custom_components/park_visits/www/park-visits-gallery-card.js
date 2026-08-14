@@ -21,6 +21,14 @@ function escapeHtml(value) {
   );
 }
 
+// "YYYY-MM-DD" -> locale date string, without the UTC-shift-by-a-day trap
+// that `new Date("YYYY-MM-DD")` alone falls into near midnight.
+function formatLocalDate(dateStr) {
+  if (!dateStr) return "—";
+  const d = new Date(`${dateStr}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? dateStr : d.toLocaleDateString();
+}
+
 class ParkVisitsGalleryCard extends HTMLElement {
   constructor() {
     super();
@@ -210,10 +218,15 @@ class ParkVisitsGalleryCard extends HTMLElement {
     const { park, url } = this._tiles[this._openIndex];
     const many = this._tiles.length > 1;
 
-    const review = park.reviewed_at
+    const ratingLine = (label, value) =>
+      value != null ? `<div><strong>${label}:</strong> ${escapeHtml(value)}/10</div>` : "";
+    const review = park.visit_date
       ? `
         <div class="pvg-review">
-          <div><strong>Our rating:</strong> ${escapeHtml(park.rating)}/10</div>
+          ${ratingLine("Overall Rating", park.overall_rating)}
+          ${ratingLine("Kids Rating", park.kids_rating)}
+          ${ratingLine("Mums Rating", park.mums_rating)}
+          ${ratingLine("Dads Rating", park.dads_rating)}
           ${park.liked ? `<div><strong>Liked:</strong> ${escapeHtml(park.liked)}</div>` : ""}
           ${
             park.disliked
@@ -221,9 +234,7 @@ class ParkVisitsGalleryCard extends HTMLElement {
               : ""
           }
           ${park.note ? `<div><strong>Notes:</strong> ${escapeHtml(park.note)}</div>` : ""}
-          <div class="pvg-muted">Reviewed ${escapeHtml(
-            new Date(park.reviewed_at).toLocaleString()
-          )}</div>
+          <div class="pvg-muted">Visited ${escapeHtml(formatLocalDate(park.visit_date))}</div>
         </div>`
       : `<div class="pvg-muted">Photo added, but this park hasn't been reviewed yet.</div>`;
 

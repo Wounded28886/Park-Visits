@@ -11,10 +11,86 @@ rate_park:
       required: true
       selector:
         text:
-    rating:
-      name: Rating
-      description: Your rating out of 10.
+    visit_date:
+      name: Visit date
+      description: The day the visit actually happened. Defaults to today in the table card, but can be back-dated.
       required: true
+      selector:
+        date:
+    kids_rating:
+      name: Kids Rating
+      description: The kids' rating out of 10. This is the only rating that's required.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.5
+          mode: slider
+    mums_rating:
+      name: Mums Rating
+      description: Mum's rating out of 10.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.5
+          mode: slider
+    dads_rating:
+      name: Dads Rating
+      description: Dad's rating out of 10.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.5
+          mode: slider
+    playground_rating:
+      name: Playground
+      description: Playground rating out of 10.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.5
+          mode: slider
+    scenery_rating:
+      name: Scenery
+      description: Scenery rating out of 10.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.5
+          mode: slider
+    wildlife_rating:
+      name: Wildlife
+      description: Wildlife rating out of 10.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.5
+          mode: slider
+    facilities_rating:
+      name: Facilities
+      description: Facilities rating out of 10.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 0.5
+          mode: slider
+    parking_rating:
+      name: Parking
+      description: Parking rating out of 10.
+      required: false
       selector:
         number:
           min: 0

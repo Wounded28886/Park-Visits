@@ -7,7 +7,10 @@ the **Google Places API**, ranked by Google rating.
 
 The dashboard is a sortable table: click a column to sort by it, click a park
 to open its detail panel with Google's photos and reviews, and write your own
-review — rating, what you liked, what you didn't, notes and photos.
+review — a visit date, per-person and per-aspect ratings, what you liked,
+what you didn't, notes and photos. A second **Visited** view tracks progress
+against the whole tracked list with a "23 / 100 visited" bar and a table of
+every visited park.
 
 ## What it does
 
@@ -28,15 +31,19 @@ review — rating, what you liked, what you didn't, notes and photos.
   - One **`geo_location`** entity per tracked park, carrying rank,
     categories, address, Google rating/count, a Google Maps link, and our
     own review summary.
-  - Three summary **sensors**: `sensor.nearby_parks` (how many parks are
-    tracked), `sensor.next_park` (the park we plan to visit next) and
-    `sensor.last_visited_park` (the most recently reviewed park). The last
-    two are usable in automations — "remind us about the next park on
-    Saturday morning", say.
+  - Four summary **sensors**: `sensor.nearby_parks` (how many parks are
+    tracked), `sensor.next_park` (the park we plan to visit next),
+    `sensor.last_visited_park` (the most recently *visited* park, by visit
+    date) and `sensor.parks_visited` (how many of the tracked parks have a
+    review, with `total` and `percent` attributes — what the Visited view's
+    progress bar is built from). The first three are usable in
+    automations — "remind us about the next park on Saturday morning", say.
   - A **"Refresh parks" button** — see [Refresh cost](#refresh-cost-and-cadence).
-- Registers services to record and remove reviews — **`rate_park`** (rating,
-  liked, disliked, notes), **`delete_review`** (also deletes that review's
-  photo files) and **`delete_photo`** (one photo) — plus
+- Registers services to record and remove reviews — **`rate_park`** (visit
+  date, Kids Rating required, Mums/Dads/Playground/Scenery/Wildlife/
+  Facilities/Parking ratings optional, liked, disliked, notes — see
+  [Family ratings](#family-ratings)), **`delete_review`** (also deletes that
+  review's photo files) and **`delete_photo`** (one photo) — plus
   **`set_next_park`** / **`clear_next_park`** for planning the next visit. Reviews are stored locally
   (`.storage`, keyed by Google's place_id) and survive dataset refreshes —
   including a park dropping out of the tracked list, since the park's name is
@@ -49,8 +56,11 @@ review — rating, what you liked, what you didn't, notes and photos.
     panel with Google's rating, editorial summary, opening hours, website,
     photos and written reviews, plus our own review. Writing or editing a
     review opens its **own popup** in place of that panel, where you can set
-    a rating, record what you liked and didn't, add notes, attach photos,
-    delete individual photos, or delete the whole review.
+    the visit date, every rating, what you liked and didn't, add notes,
+    attach photos, delete individual photos, or delete the whole review. The
+    card's `columns` config controls which columns show (see
+    [Family ratings](#family-ratings)), and `only_visited` / `show_progress`
+    power the Visited view.
   - `park-visits-gallery-card` — a collage of every photo attached to a
     review. Click one to see it large alongside the park name and our
     review, and page through the rest.
@@ -73,6 +83,37 @@ Your own uploaded photos are written to `<config>/park_visits_photos/<place_id>/
 and served through the same signed-path mechanism. Only the filenames are kept
 in the review store, since that file is held in memory and rewritten on every
 save.
+
+## Family ratings
+
+A review is a **visit date** (defaults to today, but can be back-dated —
+this is what drives "last visited" and the Visited view's sort, not when you
+happened to type the review in) plus up to eight ratings out of 10:
+
+- **Kids Rating** — the only rating that's required.
+- **Mums Rating**, **Dads Rating** — optional.
+- **Playground**, **Scenery**, **Wildlife**, **Facilities**, **Parking** —
+  optional per-aspect scores.
+
+**Overall Rating** isn't entered — it's the average of whichever of Kids,
+Mums and Dads ratings were filled in, computed fresh every time
+(`Review.overall_rating` in `storage.py`) so it can never drift out of sync
+with the ratings it's built from. It's what shows in the main Parks table
+and what `sensor.last_visited_park` reports.
+
+The table card only shows the columns you list in its `columns` config
+(anything omitted just isn't rendered — the underlying data is still there).
+The default Parks view keeps things compact: rank, name, Google rating,
+categories, distance, Overall Rating. The Visited view opts into every
+rating column plus the visit date — see `dashboards/park_visits_dashboard.yaml`
+for the exact list, or write your own.
+
+**If you're upgrading from a version before this**, your existing single
+0–10 rating becomes the **Kids Rating** on every existing review, and the
+date portion of its old timestamp becomes its **visit date** — nothing is
+lost, but Mums/Dads/Playground/Scenery/Wildlife/Facilities/Parking start
+blank on those older reviews until you edit them. This happens automatically
+the first time each review is loaded; there's no manual migration step.
 
 ## Installation
 
@@ -131,8 +172,11 @@ almost always a cached copy of the JS file, not a setup problem.
 2. Paste the contents of
    [`dashboards/park_visits_dashboard.yaml`](dashboards/park_visits_dashboard.yaml).
 
-The card filters by the `source: park_visits` attribute rather than entity
-IDs, so it keeps working if Home Assistant suffixes your entity names.
+This gives you three views: **Parks** (the top-rated list), **Visited**
+(progress bar + every visited park with all its ratings) and **Gallery**
+(photo collage). The cards filter by the `source: park_visits` attribute
+rather than entity IDs, so they keep working if Home Assistant suffixes
+your entity names.
 
 ## Refresh cost and cadence
 

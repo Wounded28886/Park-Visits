@@ -64,12 +64,20 @@ class RankedPark:
     rating_count: int
     google_maps_uri: str | None
     distance_km: float
-    our_rating: float | None
+    our_kids_rating: float | None
+    our_mums_rating: float | None
+    our_dads_rating: float | None
+    our_playground_rating: float | None
+    our_scenery_rating: float | None
+    our_wildlife_rating: float | None
+    our_facilities_rating: float | None
+    our_parking_rating: float | None
+    our_overall_rating: float | None
     our_note: str
     our_liked: str
     our_disliked: str
     our_photo_count: int
-    our_reviewed_at: str | None
+    our_visit_date: str | None
 
 
 def _tile_centers(
@@ -254,15 +262,20 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
                     "rating_count": place.get("userRatingCount", 0),
                     "google_maps_uri": place.get("googleMapsUri"),
                     "distance_km": haversine_km(center_lat, center_lon, lat, lon),
-                    # A review created purely by a photo upload has no rating
-                    # yet (reviewed_at is empty) — treat that as unrated so it
-                    # doesn't show as 0/10.
-                    "our_rating": review.rating if (review and review.reviewed_at) else None,
+                    "our_kids_rating": review.kids_rating if review else None,
+                    "our_mums_rating": review.mums_rating if review else None,
+                    "our_dads_rating": review.dads_rating if review else None,
+                    "our_playground_rating": review.playground_rating if review else None,
+                    "our_scenery_rating": review.scenery_rating if review else None,
+                    "our_wildlife_rating": review.wildlife_rating if review else None,
+                    "our_facilities_rating": review.facilities_rating if review else None,
+                    "our_parking_rating": review.parking_rating if review else None,
+                    "our_overall_rating": review.overall_rating if review else None,
                     "our_note": review.note if review else "",
                     "our_liked": review.liked if review else "",
                     "our_disliked": review.disliked if review else "",
                     "our_photo_count": len(review.photos) if review else 0,
-                    "our_reviewed_at": (review.reviewed_at or None) if review else None,
+                    "our_visit_date": (review.visit_date or None) if review else None,
                 }
             )
 
@@ -328,17 +341,19 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         return planned
 
     def last_visited(self) -> dict[str, Any] | None:
-        """The most recently reviewed park — writing a review is the record of a visit.
+        """The most recently *visited* park, by the visit date chosen on the review.
 
         Read from the review store rather than the tracked list so a park that
-        has since dropped out of the top N is still reported.
+        has since dropped out of the top N is still reported. Sorted by
+        visit_date rather than when the review happened to be submitted, so
+        back-dating a visit reorders this correctly.
         """
         latest_id = None
         latest = None
         for place_id, review in self.reviews.all_reviews().items():
-            if not review.reviewed_at:
+            if not review.visit_date:
                 continue
-            if latest is None or review.reviewed_at > latest.reviewed_at:
+            if latest is None or review.visit_date > latest.visit_date:
                 latest, latest_id = review, place_id
         if latest is None:
             return None
@@ -347,12 +362,15 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         return {
             "place_id": latest_id,
             "park_name": (park.name if park else "") or latest.park_name or "Unknown park",
-            "our_rating": latest.rating,
+            "our_overall_rating": latest.overall_rating,
+            "our_kids_rating": latest.kids_rating,
+            "our_mums_rating": latest.mums_rating,
+            "our_dads_rating": latest.dads_rating,
             "our_liked": latest.liked,
             "our_disliked": latest.disliked,
             "our_note": latest.note,
             "our_photo_count": len(latest.photos),
-            "reviewed_at": latest.reviewed_at,
+            "visit_date": latest.visit_date,
             "rating": park.rating if park else None,
             "distance_km": park.distance_km if park else None,
             "still_tracked": park is not None,
@@ -369,7 +387,15 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
     async def async_submit_review(
         self,
         place_id: str,
-        rating: float,
+        kids_rating: float,
+        visit_date: str,
+        mums_rating: float | None = None,
+        dads_rating: float | None = None,
+        playground_rating: float | None = None,
+        scenery_rating: float | None = None,
+        wildlife_rating: float | None = None,
+        facilities_rating: float | None = None,
+        parking_rating: float | None = None,
         note: str = "",
         liked: str = "",
         disliked: str = "",
@@ -377,7 +403,15 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         """Record a review locally and refresh entities without hitting the API."""
         await self.reviews.async_set_review(
             place_id,
-            rating,
+            kids_rating,
+            visit_date,
+            mums_rating=mums_rating,
+            dads_rating=dads_rating,
+            playground_rating=playground_rating,
+            scenery_rating=scenery_rating,
+            wildlife_rating=wildlife_rating,
+            facilities_rating=facilities_rating,
+            parking_rating=parking_rating,
             liked=liked,
             disliked=disliked,
             note=note,
@@ -413,10 +447,18 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         reviews = self.reviews.all_reviews()
         for park in self.data:
             review = reviews.get(park.place_id)
-            park.our_rating = review.rating if (review and review.reviewed_at) else None
+            park.our_kids_rating = review.kids_rating if review else None
+            park.our_mums_rating = review.mums_rating if review else None
+            park.our_dads_rating = review.dads_rating if review else None
+            park.our_playground_rating = review.playground_rating if review else None
+            park.our_scenery_rating = review.scenery_rating if review else None
+            park.our_wildlife_rating = review.wildlife_rating if review else None
+            park.our_facilities_rating = review.facilities_rating if review else None
+            park.our_parking_rating = review.parking_rating if review else None
+            park.our_overall_rating = review.overall_rating if review else None
             park.our_note = review.note if review else ""
             park.our_liked = review.liked if review else ""
             park.our_disliked = review.disliked if review else ""
             park.our_photo_count = len(review.photos) if review else 0
-            park.our_reviewed_at = (review.reviewed_at or None) if review else None
+            park.our_visit_date = (review.visit_date or None) if review else None
         self.async_set_updated_data(self.data)

@@ -4,8 +4,9 @@
  * A spreadsheet-style table of every park tracked by the Park Visits
  * integration. Click a column header to sort by it; click again to reverse.
  * Click a park's name to open its detail panel: Google's rating, photos and
- * reviews, plus our own review and a form to write or update it (rating,
- * what we liked, what we didn't, notes and photos).
+ * reviews, plus our own review and a form to write or update it (a visit
+ * date, ratings for kids/mums/dads plus playground/scenery/wildlife/
+ * facilities/parking, what we liked, what we didn't, notes and photos).
  *
  * Install: copy this file to config/www/park-visits-table-card.js, then add
  * it as a dashboard resource (Settings > Dashboards > Resources):
@@ -15,9 +16,28 @@
  *   type: custom:park-visits-table-card
  *   title: Top parks
  *   source: park_visits
- *   default_sort: rank        # rank | name | rating | categories | distance | our_rating
+ *   default_sort: rank        # any column key below
  *   default_direction: asc    # asc | desc
  *   show_filter: true
+ *   only_visited: false       # true = only rows with a visit date
+ *   show_progress: false      # true = "X / Y visited" bar above the table
+ *   columns:                  # optional; omit for the default set below
+ *     - rank
+ *     - name
+ *     - rating
+ *     - categories
+ *     - distance
+ *     - our_overall_rating
+ *     - our_kids_rating
+ *     - our_mums_rating
+ *     - our_dads_rating
+ *     - our_playground_rating
+ *     - our_scenery_rating
+ *     - our_wildlife_rating
+ *     - our_facilities_rating
+ *     - our_parking_rating
+ *     - our_visit_date
+ *     - review
  */
 
 function escapeHtml(value) {
@@ -27,10 +47,38 @@ function escapeHtml(value) {
   );
 }
 
+// "YYYY-MM-DD" -> locale date string, without the UTC-shift-by-a-day trap
+// that `new Date("YYYY-MM-DD")` alone falls into near midnight.
+function formatLocalDate(dateStr) {
+  if (!dateStr) return "—";
+  const d = new Date(`${dateStr}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? dateStr : d.toLocaleDateString();
+}
+
+// Today as "YYYY-MM-DD" in the browser's local timezone (not UTC, which
+// `new Date().toISOString()` alone would use and could be a day off).
+function todayLocalDate() {
+  const d = new Date();
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function ratingColumn(key, label) {
+  return {
+    key,
+    label,
+    numeric: true,
+    value: (s) => s.attributes[key],
+    display: (s) => (s.attributes[key] != null ? `${s.attributes[key]}/10` : "—"),
+  };
+}
+
 // Each column knows how to pull a display string and a sortable value.
 // Keeping those separate is what lets "4.9 (273)" sort by 4.9 rather than
-// alphabetically, and lets blanks sort last regardless of direction.
-const COLUMNS = [
+// alphabetically, and lets blanks sort last regardless of direction. A card
+// shows whichever subset its `columns` config lists (DEFAULT_COLUMN_KEYS if
+// omitted) — see _columns() below.
+const ALL_COLUMNS = [
   {
     key: "rank",
     label: "#",
@@ -49,7 +97,7 @@ const COLUMNS = [
   },
   {
     key: "rating",
-    label: "Rating",
+    label: "Google Rating",
     numeric: true,
     value: (s) => s.attributes.rating,
     display: (s) =>
@@ -78,27 +126,52 @@ const COLUMNS = [
       Number.isNaN(parseFloat(s.state)) ? "—" : `${parseFloat(s.state).toFixed(1)} km`,
   },
   {
-    key: "our_rating",
-    label: "Your rating",
+    key: "our_visit_date",
+    label: "Visited",
+    value: (s) => s.attributes.our_visit_date || null,
+    display: (s) => formatLocalDate(s.attributes.our_visit_date),
+  },
+  {
+    key: "our_overall_rating",
+    label: "Overall Rating",
     numeric: true,
-    value: (s) => s.attributes.our_rating,
+    value: (s) => s.attributes.our_overall_rating,
     display: (s) => {
       const bits = [];
-      if (s.attributes.our_rating != null) bits.push(`${s.attributes.our_rating}/10`);
+      if (s.attributes.our_overall_rating != null)
+        bits.push(`${s.attributes.our_overall_rating}/10`);
       if (s.attributes.our_photo_count)
         bits.push(`<span class="muted">📷${s.attributes.our_photo_count}</span>`);
       return bits.join(" ") || "—";
     },
   },
+  ratingColumn("our_kids_rating", "Kids Rating"),
+  ratingColumn("our_mums_rating", "Mums Rating"),
+  ratingColumn("our_dads_rating", "Dads Rating"),
+  ratingColumn("our_playground_rating", "Playground"),
+  ratingColumn("our_scenery_rating", "Scenery"),
+  ratingColumn("our_wildlife_rating", "Wildlife"),
+  ratingColumn("our_facilities_rating", "Facilities"),
+  ratingColumn("our_parking_rating", "Parking"),
   {
     key: "review",
     label: "",
     sortable: false,
     display: (s) =>
       `<button class="pv-rowbtn" data-entity="${escapeHtml(s.entity_id)}">${
-        s.attributes.our_reviewed_at != null ? "Edit" : "Review"
+        s.attributes.our_visit_date != null ? "Edit" : "Review"
       }</button>`,
   },
+];
+
+const DEFAULT_COLUMN_KEYS = [
+  "rank",
+  "name",
+  "rating",
+  "categories",
+  "distance",
+  "our_overall_rating",
+  "review",
 ];
 
 class ParkVisitsTableCard extends HTMLElement {
@@ -115,6 +188,7 @@ class ParkVisitsTableCard extends HTMLElement {
     this._busy = false;
     this._photoItems = [];
     this._lightboxIndex = null;
+    this._progressSignature = null;
   }
 
   setConfig(config) {
@@ -124,9 +198,16 @@ class ParkVisitsTableCard extends HTMLElement {
       default_sort: "rank",
       default_direction: "asc",
       show_filter: true,
+      only_visited: false,
+      show_progress: false,
       ...config,
     };
-    if (COLUMNS.some((c) => c.key === this.config.default_sort)) {
+    const keys =
+      Array.isArray(this.config.columns) && this.config.columns.length
+        ? this.config.columns
+        : DEFAULT_COLUMN_KEYS;
+    this._columns = keys.map((k) => ALL_COLUMNS.find((c) => c.key === k)).filter(Boolean);
+    if (ALL_COLUMNS.some((c) => c.key === this.config.default_sort)) {
       this._sortKey = this.config.default_sort;
     }
     this._sortDir = this.config.default_direction === "desc" ? "desc" : "asc";
@@ -154,7 +235,36 @@ class ParkVisitsTableCard extends HTMLElement {
     this._hass = hass;
     this._renderRows();
     this._renderStatusStrip();
+    this._renderProgress();
     if (this._openEntity) this._maybeRerenderDialog();
+  }
+
+  /* -------------------------------------------------------------- progress */
+
+  _renderProgress() {
+    if (!this.config || !this.config.show_progress || !this._hass) return;
+    const el = this.querySelector(".pv-progress");
+    if (!el) return;
+
+    // Always computed from every tracked park, regardless of an
+    // `only_visited` filter on this card's own rows — the point of the bar
+    // is overall progress, not "progress among what happens to be visible".
+    const all = Object.values(this._hass.states).filter(
+      (s) => s.attributes.source === this.config.source
+    );
+    const total = all.length;
+    const visited = all.filter((s) => !!s.attributes.our_visit_date).length;
+    const signature = `${visited}/${total}`;
+    if (signature === this._progressSignature) return;
+    this._progressSignature = signature;
+
+    const percent = total ? Math.round((visited / total) * 100) : 0;
+    el.innerHTML = `
+      <div class="pv-progress-label">${visited} / ${total} visited</div>
+      <div class="pv-progress-bar">
+        <div class="pv-progress-fill" style="width:${percent}%"></div>
+        <div class="pv-progress-pct">${percent}%</div>
+      </div>`;
   }
 
   /* -------------------------------------------------- last visited / next */
@@ -189,7 +299,7 @@ class ParkVisitsTableCard extends HTMLElement {
 
     const signature = JSON.stringify([
       next && [next.state, next.attributes.place_id, next.attributes.distance_km],
-      last && [last.state, last.attributes.place_id, last.attributes.reviewed_at],
+      last && [last.state, last.attributes.place_id, last.attributes.visit_date],
       this._pickerOpen,
     ]);
     if (signature === this._stripSignature) return;
@@ -201,12 +311,12 @@ class ParkVisitsTableCard extends HTMLElement {
     const lastBody = hasLast
       ? `<div class="pv-strip-name">${escapeHtml(last.state)}</div>
          <div class="pv-strip-sub">${
-           last.attributes.our_rating != null
-             ? `We rated it ${escapeHtml(last.attributes.our_rating)}/10`
+           last.attributes.our_overall_rating != null
+             ? `We rated it ${escapeHtml(last.attributes.our_overall_rating)}/10`
              : "Not rated"
          }${
-          last.attributes.reviewed_at
-            ? ` · ${escapeHtml(new Date(last.attributes.reviewed_at).toLocaleDateString())}`
+          last.attributes.visit_date
+            ? ` · ${escapeHtml(formatLocalDate(last.attributes.visit_date))}`
             : ""
         }</div>`
       : `<div class="pv-strip-empty">No visits recorded yet — review a park to log one.</div>`;
@@ -353,12 +463,20 @@ class ParkVisitsTableCard extends HTMLElement {
     return [
       state.last_updated,
       a.friendly_name,
-      a.our_rating,
+      a.our_kids_rating,
+      a.our_mums_rating,
+      a.our_dads_rating,
+      a.our_playground_rating,
+      a.our_scenery_rating,
+      a.our_wildlife_rating,
+      a.our_facilities_rating,
+      a.our_parking_rating,
+      a.our_overall_rating,
       a.our_liked,
       a.our_disliked,
       a.our_note,
       a.our_photo_count,
-      a.our_reviewed_at,
+      a.our_visit_date,
       this._details ? "details" : "nodetails",
       this._detailsError ? "err" : "ok",
       (this._googlePhotoUrls || []).length,
@@ -385,8 +503,8 @@ class ParkVisitsTableCard extends HTMLElement {
     if (!pending || pending.placeId !== a.place_id) return a;
 
     const caughtUp = pending.cleared
-      ? a.our_reviewed_at == null
-      : a.our_reviewed_at != null && Number(a.our_rating) === Number(pending.rating);
+      ? a.our_visit_date == null
+      : a.our_visit_date != null && Number(a.our_kids_rating) === Number(pending.kidsRating);
     if (caughtUp) {
       this._pendingReview = null;
       return a;
@@ -395,11 +513,19 @@ class ParkVisitsTableCard extends HTMLElement {
     return pending.cleared
       ? {
           ...a,
-          our_rating: null,
+          our_kids_rating: null,
+          our_mums_rating: null,
+          our_dads_rating: null,
+          our_playground_rating: null,
+          our_scenery_rating: null,
+          our_wildlife_rating: null,
+          our_facilities_rating: null,
+          our_parking_rating: null,
+          our_overall_rating: null,
           our_liked: "",
           our_disliked: "",
           our_note: "",
-          our_reviewed_at: null,
+          our_visit_date: null,
           our_photo_count: 0,
         }
       : { ...a, ...pending.values };
@@ -428,6 +554,7 @@ class ParkVisitsTableCard extends HTMLElement {
       <ha-card header="${escapeHtml(this.config.title)}">
         <div class="card-content">
           <div class="pv-status-strip"></div>
+          ${this.config.show_progress ? `<div class="pv-progress"></div>` : ""}
           ${
             this.config.show_filter
               ? `<input class="pv-filter" type="search" placeholder="Filter parks…" />`
@@ -435,7 +562,7 @@ class ParkVisitsTableCard extends HTMLElement {
           }
           <div class="pv-scroll">
             <table class="pv-table">
-              <thead><tr>${COLUMNS.map((c) =>
+              <thead><tr>${this._columns.map((c) =>
                 c.sortable === false
                   ? `<th class="pv-nosort"></th>`
                   : `<th data-key="${c.key}" title="Sort by ${escapeHtml(
@@ -481,6 +608,7 @@ class ParkVisitsTableCard extends HTMLElement {
 
     this._renderRows();
     this._renderStatusStrip();
+    this._renderProgress();
   }
 
   /* --------------------------------------------------------------- table */
@@ -502,6 +630,9 @@ class ParkVisitsTableCard extends HTMLElement {
     let rows = Object.values(this._hass.states).filter(
       (s) => s.attributes.source === this.config.source
     );
+    if (this.config.only_visited) {
+      rows = rows.filter((s) => !!s.attributes.our_visit_date);
+    }
     if (this._filter) {
       rows = rows.filter((s) => {
         const hay = `${s.attributes.friendly_name || ""} ${(
@@ -510,7 +641,7 @@ class ParkVisitsTableCard extends HTMLElement {
         return hay.includes(this._filter);
       });
     }
-    const col = COLUMNS.find((c) => c.key === this._sortKey) || COLUMNS[0];
+    const col = ALL_COLUMNS.find((c) => c.key === this._sortKey) || ALL_COLUMNS[0];
     const dir = this._sortDir === "desc" ? -1 : 1;
     return rows.sort((a, b) => {
       const va = col.value(a);
@@ -543,9 +674,9 @@ class ParkVisitsTableCard extends HTMLElement {
     this.querySelector("tbody").innerHTML = rows
       .map(
         (s) =>
-          `<tr>${COLUMNS.map(
-            (c) => `<td class="${c.numeric ? "num" : ""}">${c.display(s)}</td>`
-          ).join("")}</tr>`
+          `<tr>${this._columns
+            .map((c) => `<td class="${c.numeric ? "num" : ""}">${c.display(s)}</td>`)
+            .join("")}</tr>`
       )
       .join("");
 
@@ -559,7 +690,7 @@ class ParkVisitsTableCard extends HTMLElement {
 
     const countEl = this.querySelector(".pv-count");
     if (countEl) {
-      const col = COLUMNS.find((c) => c.key === this._sortKey);
+      const col = ALL_COLUMNS.find((c) => c.key === this._sortKey);
       countEl.textContent = `${rows.length} park${rows.length === 1 ? "" : "s"} — sorted by ${
         col ? col.label : this._sortKey
       } (${this._sortDir === "asc" ? "ascending" : "descending"})`;
@@ -739,11 +870,21 @@ class ParkVisitsTableCard extends HTMLElement {
           d ? "Google has no written reviews for this park." : "Loading…"
         }</div>`;
 
-    const hasOurReview = a.our_reviewed_at != null;
+    const hasOurReview = a.our_visit_date != null;
+    const ratingLine = (label, value) =>
+      value != null ? `<div><strong>${label}:</strong> ${escapeHtml(value)}/10</div>` : "";
     const ourReview = hasOurReview
       ? `
         <div class="pv-ourreview">
-          <div><strong>Our rating:</strong> ${escapeHtml(a.our_rating)}/10</div>
+          ${ratingLine("Overall Rating", a.our_overall_rating)}
+          ${ratingLine("Kids Rating", a.our_kids_rating)}
+          ${ratingLine("Mums Rating", a.our_mums_rating)}
+          ${ratingLine("Dads Rating", a.our_dads_rating)}
+          ${ratingLine("Playground", a.our_playground_rating)}
+          ${ratingLine("Scenery", a.our_scenery_rating)}
+          ${ratingLine("Wildlife", a.our_wildlife_rating)}
+          ${ratingLine("Facilities", a.our_facilities_rating)}
+          ${ratingLine("Parking", a.our_parking_rating)}
           ${a.our_liked ? `<div><strong>Liked:</strong> ${escapeHtml(a.our_liked)}</div>` : ""}
           ${
             a.our_disliked
@@ -751,9 +892,7 @@ class ParkVisitsTableCard extends HTMLElement {
               : ""
           }
           ${a.our_note ? `<div><strong>Notes:</strong> ${escapeHtml(a.our_note)}</div>` : ""}
-          <div class="muted pv-when">Reviewed ${escapeHtml(
-            new Date(a.our_reviewed_at).toLocaleString()
-          )}</div>
+          <div class="muted pv-when">Visited ${escapeHtml(formatLocalDate(a.our_visit_date))}</div>
         </div>`
       : `<div class="muted">We haven't reviewed this park yet.</div>`;
 
@@ -940,11 +1079,31 @@ class ParkVisitsTableCard extends HTMLElement {
       )
       .join("");
 
+    const ratingField = (name, label, value, required) => `
+      <div class="pv-rating-field">
+        <label>${label}${required ? " *" : ""}</label>
+        <input type="number" name="${name}" min="0" max="10" step="0.5"
+               value="${escapeHtml(value ?? "")}" ${required ? "required" : ""}>
+      </div>`;
+
     return `
       <form class="pv-form">
-        <label>Rating (0–10)</label>
-        <input type="number" name="rating" min="0" max="10" step="0.5"
-               value="${escapeHtml(a.our_rating ?? "")}" required>
+        <label>Visit date</label>
+        <input type="date" name="visit_date"
+               value="${escapeHtml(a.our_visit_date || todayLocalDate())}" required>
+
+        <label class="pv-form-section">Ratings (out of 10)</label>
+        <div class="pv-rating-grid">
+          ${ratingField("kids_rating", "Kids Rating", a.our_kids_rating, true)}
+          ${ratingField("mums_rating", "Mums Rating", a.our_mums_rating, false)}
+          ${ratingField("dads_rating", "Dads Rating", a.our_dads_rating, false)}
+          ${ratingField("playground_rating", "Playground", a.our_playground_rating, false)}
+          ${ratingField("scenery_rating", "Scenery", a.our_scenery_rating, false)}
+          ${ratingField("wildlife_rating", "Wildlife", a.our_wildlife_rating, false)}
+          ${ratingField("facilities_rating", "Facilities", a.our_facilities_rating, false)}
+          ${ratingField("parking_rating", "Parking", a.our_parking_rating, false)}
+        </div>
+
         <label>What we liked</label>
         <textarea name="liked" rows="3">${escapeHtml(a.our_liked || "")}</textarea>
         <label>What we didn't like</label>
@@ -1043,12 +1202,35 @@ class ParkVisitsTableCard extends HTMLElement {
       status.textContent = "Saving…";
       status.className = "pv-status";
 
+      // Optional rating inputs: an empty box means "not rated", not "0".
+      const optionalRating = (input) => (input.value === "" ? undefined : parseFloat(input.value));
+
       const submitted = {
-        rating: parseFloat(form.rating.value),
+        kids_rating: parseFloat(form.kids_rating.value),
+        visit_date: form.visit_date.value,
+        mums_rating: optionalRating(form.mums_rating),
+        dads_rating: optionalRating(form.dads_rating),
+        playground_rating: optionalRating(form.playground_rating),
+        scenery_rating: optionalRating(form.scenery_rating),
+        wildlife_rating: optionalRating(form.wildlife_rating),
+        facilities_rating: optionalRating(form.facilities_rating),
+        parking_rating: optionalRating(form.parking_rating),
         liked: form.liked.value,
         disliked: form.disliked.value,
         note: form.note.value,
       };
+      // Voluptuous Optional fields are happiest simply absent rather than
+      // explicitly null, and it keeps the service call data uncluttered.
+      Object.keys(submitted).forEach((k) => submitted[k] === undefined && delete submitted[k]);
+
+      // Mirrors the backend's Review.overall_rating property so the
+      // optimistic overlay below shows the right number immediately,
+      // instead of waiting for the entity state to catch up.
+      const overallValues = [submitted.kids_rating, submitted.mums_rating, submitted.dads_rating]
+        .filter((v) => v != null);
+      const overallRating = overallValues.length
+        ? Math.round((overallValues.reduce((a, b) => a + b, 0) / overallValues.length) * 100) / 100
+        : null;
 
       try {
         await this._hass.callService("park_visits", "rate_park", {
@@ -1057,13 +1239,21 @@ class ParkVisitsTableCard extends HTMLElement {
         });
         this._pendingReview = {
           placeId,
-          rating: submitted.rating,
+          kidsRating: submitted.kids_rating,
           values: {
-            our_rating: submitted.rating,
+            our_kids_rating: submitted.kids_rating,
+            our_mums_rating: submitted.mums_rating ?? null,
+            our_dads_rating: submitted.dads_rating ?? null,
+            our_playground_rating: submitted.playground_rating ?? null,
+            our_scenery_rating: submitted.scenery_rating ?? null,
+            our_wildlife_rating: submitted.wildlife_rating ?? null,
+            our_facilities_rating: submitted.facilities_rating ?? null,
+            our_parking_rating: submitted.parking_rating ?? null,
+            our_overall_rating: overallRating,
             our_liked: submitted.liked,
             our_disliked: submitted.disliked,
             our_note: submitted.note,
-            our_reviewed_at: new Date().toISOString(),
+            our_visit_date: submitted.visit_date,
           },
         };
 
@@ -1213,6 +1403,24 @@ const STYLES = `
   }
   .pv-count { margin-top: 8px; font-size: 12px; opacity: 0.7; }
 
+  .pv-progress { margin-bottom: 12px; }
+  .pv-progress-label { font-size: 13px; opacity: 0.8; margin-bottom: 4px; }
+  .pv-progress-bar {
+    position: relative; height: 22px; border-radius: 11px; overflow: hidden;
+    background: var(--secondary-background-color, #2a2a2a);
+    border: 1px solid var(--divider-color, #333);
+  }
+  .pv-progress-fill {
+    position: absolute; top: 0; left: 0; bottom: 0;
+    background: var(--primary-color, #03a9f4);
+    transition: width 0.3s ease;
+  }
+  .pv-progress-pct {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end;
+    padding-right: 8px; font-size: 12px; font-weight: 600; color: var(--primary-text-color, #eee);
+    text-shadow: 0 0 3px rgba(0,0,0,0.6);
+  }
+
   .pv-backdrop {
     position: fixed; inset: 0; background: rgba(0,0,0,0.6);
     display: flex; align-items: flex-start; justify-content: center;
@@ -1269,11 +1477,24 @@ const STYLES = `
   }
   .pv-form { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
   .pv-form label { font-size: 12px; opacity: 0.75; }
-  .pv-form input[type=number], .pv-form textarea, .pv-form input[type=file] {
+  .pv-form label.pv-form-section {
+    margin-top: 8px; font-size: 12px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em; opacity: 0.7 !important;
+  }
+  .pv-form input[type=number], .pv-form input[type=date], .pv-form textarea,
+  .pv-form input[type=file] {
     width: 100%; box-sizing: border-box; padding: 6px; font: inherit;
     border-radius: 6px; border: 1px solid var(--divider-color, #333);
     background: var(--primary-background-color, #111); color: var(--primary-text-color, #eee);
   }
+  .pv-rating-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 8px; margin-bottom: 4px;
+  }
+  .pv-rating-field label {
+    display: block; font-size: 12px; opacity: 0.75; margin-bottom: 2px;
+  }
+  .pv-rating-field input { width: 100%; box-sizing: border-box; }
   .pv-form-actions {
     display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap;
   }

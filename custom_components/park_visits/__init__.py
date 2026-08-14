@@ -18,12 +18,20 @@ from .const import (
     DOMAIN,
     MAX_OUR_RATING,
     MIN_OUR_RATING,
+    SERVICE_ATTR_DADS_RATING,
     SERVICE_ATTR_DISLIKED,
+    SERVICE_ATTR_FACILITIES_RATING,
     SERVICE_ATTR_FILENAME,
+    SERVICE_ATTR_KIDS_RATING,
     SERVICE_ATTR_LIKED,
+    SERVICE_ATTR_MUMS_RATING,
     SERVICE_ATTR_NOTE,
+    SERVICE_ATTR_PARKING_RATING,
     SERVICE_ATTR_PLACE_ID,
-    SERVICE_ATTR_RATING,
+    SERVICE_ATTR_PLAYGROUND_RATING,
+    SERVICE_ATTR_SCENERY_RATING,
+    SERVICE_ATTR_VISIT_DATE,
+    SERVICE_ATTR_WILDLIFE_RATING,
     SERVICE_CLEAR_NEXT_PARK,
     SERVICE_DELETE_PHOTO,
     SERVICE_DELETE_REVIEW,
@@ -37,12 +45,23 @@ from .views import async_delete_photo_files, async_register_views
 
 PLATFORMS = ["geo_location", "sensor", "button"]
 
+_RATING = vol.All(vol.Coerce(float), vol.Range(min=MIN_OUR_RATING, max=MAX_OUR_RATING))
+
 RATE_PARK_SCHEMA = vol.Schema(
     {
         vol.Required(SERVICE_ATTR_PLACE_ID): cv.string,
-        vol.Required(SERVICE_ATTR_RATING): vol.All(
-            vol.Coerce(float), vol.Range(min=MIN_OUR_RATING, max=MAX_OUR_RATING)
-        ),
+        vol.Required(SERVICE_ATTR_KIDS_RATING): _RATING,
+        # ISO date, not a full timestamp — this is "the day we went", chosen
+        # by whoever writes the review (defaults to today client-side, but
+        # can be back-dated).
+        vol.Required(SERVICE_ATTR_VISIT_DATE): vol.All(cv.string, vol.Match(r"^\d{4}-\d{2}-\d{2}$")),
+        vol.Optional(SERVICE_ATTR_MUMS_RATING): _RATING,
+        vol.Optional(SERVICE_ATTR_DADS_RATING): _RATING,
+        vol.Optional(SERVICE_ATTR_PLAYGROUND_RATING): _RATING,
+        vol.Optional(SERVICE_ATTR_SCENERY_RATING): _RATING,
+        vol.Optional(SERVICE_ATTR_WILDLIFE_RATING): _RATING,
+        vol.Optional(SERVICE_ATTR_FACILITIES_RATING): _RATING,
+        vol.Optional(SERVICE_ATTR_PARKING_RATING): _RATING,
         vol.Optional(SERVICE_ATTR_LIKED, default=""): cv.string,
         vol.Optional(SERVICE_ATTR_DISLIKED, default=""): cv.string,
         vol.Optional(SERVICE_ATTR_NOTE, default=""): cv.string,
@@ -97,7 +116,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
         await coordinator.async_submit_review(
             place_id,
-            call.data[SERVICE_ATTR_RATING],
+            call.data[SERVICE_ATTR_KIDS_RATING],
+            call.data[SERVICE_ATTR_VISIT_DATE],
+            mums_rating=call.data.get(SERVICE_ATTR_MUMS_RATING),
+            dads_rating=call.data.get(SERVICE_ATTR_DADS_RATING),
+            playground_rating=call.data.get(SERVICE_ATTR_PLAYGROUND_RATING),
+            scenery_rating=call.data.get(SERVICE_ATTR_SCENERY_RATING),
+            wildlife_rating=call.data.get(SERVICE_ATTR_WILDLIFE_RATING),
+            facilities_rating=call.data.get(SERVICE_ATTR_FACILITIES_RATING),
+            parking_rating=call.data.get(SERVICE_ATTR_PARKING_RATING),
             note=call.data[SERVICE_ATTR_NOTE],
             liked=call.data[SERVICE_ATTR_LIKED],
             disliked=call.data[SERVICE_ATTR_DISLIKED],
