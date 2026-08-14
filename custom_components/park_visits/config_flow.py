@@ -94,7 +94,7 @@ async def _async_resolve_location(
 class ParkVisitsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Park Visits."""
 
-    VERSION = 3
+    VERSION = 2
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
