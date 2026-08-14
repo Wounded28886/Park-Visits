@@ -31,6 +31,7 @@ from .const import (
     SERVICE_SET_NEXT_PARK,
 )
 from .coordinator import ParkVisitsCoordinator
+from .frontend import async_register_frontend
 from .storage import ParkListCache, ParkPlanStore, ParkReviewStore
 from .views import async_delete_photo_files, async_register_views
 
@@ -162,6 +163,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async_register_views(hass)
         hass.data[DOMAIN]["_views_registered"] = True
 
+    # Same reasoning as the views above: serving the bundled Lovelace cards
+    # from inside custom_components/park_visits (rather than a top-level
+    # www/ folder) means HACS updates them with the integration — no manual
+    # copy to config/www and no manual "Add Resource" step.
+    if not hass.data[DOMAIN].get("_frontend_registered"):
+        await async_register_frontend(hass)
+        hass.data[DOMAIN]["_frontend_registered"] = True
+
     return True
 
 
@@ -175,10 +184,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id, None)
-        # hass.data[DOMAIN] also holds the _views_registered flag, so emptiness
-        # can't be used to detect "last entry gone" — count real entries.
-        # (Views themselves can't be unregistered from HA's HTTP app, so the
-        # flag deliberately survives a reload.)
+        # hass.data[DOMAIN] also holds the _views_registered/_frontend_registered
+        # flags, so emptiness can't be used to detect "last entry gone" — count
+        # real entries. (Neither views nor the static path/extra JS URL can be
+        # unregistered from HA's HTTP app, so the flags deliberately survive a
+        # reload.)
         if not any(isinstance(v, dict) and "coordinator" in v for v in hass.data[DOMAIN].values()):
             hass.services.async_remove(DOMAIN, SERVICE_RATE_PARK)
             hass.services.async_remove(DOMAIN, SERVICE_DELETE_REVIEW)

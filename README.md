@@ -108,21 +108,22 @@ save.
 3. You can change any of this later via the integration's **Configure**
    button — this triggers a reload and regenerates the tracked parks.
 
-### 4. Install the custom card
+### 4. Add the dashboard
 
-HACS installs `custom_components/park_visits` but not the `www/` folder, so
-this step is always manual regardless of how you did step 1:
+Nothing manual needed for the cards themselves: they live inside
+`custom_components/park_visits/www/`, so the integration serves them and
+registers them on every dashboard itself the moment it's set up (via
+`add_extra_js_url`) — no `config/www` copy and no "Add Resource" step, in
+HACS or manual installs alike. If you update the integration and a card
+doesn't seem to pick up a change, **hard-refresh your browser** — that's
+almost always a cached copy of the JS file, not a setup problem.
 
-1. Copy `www/park-visits-table-card.js` and `www/park-visits-gallery-card.js`
-   into your Home Assistant `config/www/` directory.
-2. **Settings > Dashboards > ⋮ > Resources > Add Resource** — once for each:
-   - `/local/park-visits-table-card.js` — type **JavaScript module**
-   - `/local/park-visits-gallery-card.js` — type **JavaScript module**
-3. Hard-refresh your browser (a plain refresh can serve a cached copy of a
-   resource URL — if the card doesn't render or doesn't pick up an update,
-   this is the first thing to try, or bump the resource URL to `...js?v=2`).
-
-### 5. Add the dashboard
+> **Upgrading from an older version?** Earlier versions needed the cards
+> copied to `config/www` and added manually under **Settings > Dashboards >
+> Resources**. After updating, remove that manual resource entry and delete
+> `config/www/park-visits-table-card.js` / `park-visits-gallery-card.js` if
+> you added them — otherwise the card loads twice and logs a harmless but
+> noisy "already defined" warning in the browser console.
 
 1. **Settings > Dashboards > Add Dashboard > New dashboard from scratch**,
    give it a name, then open it and choose **Edit in YAML** from the
@@ -165,7 +166,7 @@ nothing — they never touch Google.
 
 ```
 custom_components/park_visits/
-├── __init__.py         # entry setup/unload, rate_park service, view registration
+├── __init__.py         # entry setup/unload, rate_park service, view/frontend registration
 ├── manifest.json       # HA integration manifest
 ├── const.py            # domain, defaults, Google Places config, attribute keys
 ├── util.py             # haversine distance + geodesic tile-centre calculation
@@ -173,18 +174,26 @@ custom_components/park_visits/
 ├── coordinator.py      # tiled Google Places queries, ranking, review merging
 ├── storage.py          # persistent local reviews (place_id -> rating/liked/photos)
 ├── views.py            # HTTP: Place Details, photo proxy, photo upload/serve
+├── frontend.py          # serves www/ and registers the cards on every dashboard
 ├── config_flow.py      # setup + options UI (API key, location, radius, count)
 ├── geo_location.py     # one GeolocationEvent entity per tracked park
 ├── sensor.py           # summary "Nearby Parks" count sensor
 ├── button.py           # manual "Refresh parks" button — the only API trigger
 ├── services.yaml       # service descriptions (Developer Tools UI)
-└── strings.json / translations/en.json
-www/
-├── park-visits-table-card.js     # sortable table, park detail panel, review form
-└── park-visits-gallery-card.js   # collage of our review photos
+├── strings.json / translations/en.json
+└── www/
+    ├── park-visits-table-card.js     # sortable table, park detail panel, review form
+    └── park-visits-gallery-card.js   # collage of our review photos
 dashboards/
 └── park_visits_dashboard.yaml
 ```
+
+Bundling the cards inside `custom_components/park_visits/www/` (rather than
+a top-level `www/`) is deliberate: HACS downloads and updates the whole
+`custom_components/park_visits/` tree as one unit, so the cards ship and
+update with the integration automatically. `frontend.py` serves that folder
+at a URL and calls `add_extra_js_url()` so every dashboard picks the cards
+up without a manual Lovelace "Add Resource" step.
 
 ## Requirements
 

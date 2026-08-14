@@ -9,12 +9,9 @@
 # Requires:
 #  - The "Park Visits" integration installed and configured with a Google
 #    Places API key (Settings > Devices & Services > Add Integration >
-#    Park Visits).
-#  - www/park-visits-table-card.js and www/park-visits-gallery-card.js
-#    copied to config/www/ and each registered as a dashboard resource
-#    (Settings > Dashboards > Resources > Add Resource, URLs
-#    "/local/park-visits-table-card.js" and
-#    "/local/park-visits-gallery-card.js", type "JavaScript module").
+#    Park Visits). The integration serves its own Lovelace cards and
+#    registers them on every dashboard itself — no config/www copy and no
+#    manual "Add Resource" step needed.
 ########################################################################
 title: Park Visits
 views:
