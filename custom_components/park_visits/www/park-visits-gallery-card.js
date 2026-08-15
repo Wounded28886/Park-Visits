@@ -130,20 +130,26 @@ class ParkVisitsGalleryCard extends HTMLElement {
     const tiles = [];
     for (const park of this._items) {
       for (const filename of park.photos) {
-        const url = await this._signedPhotoUrl(park.place_id, filename);
+        const url = await this._signedPath(`/api/park_visits/photo/${park.place_id}/${filename}`);
         if (url) tiles.push({ park, filename, url });
+      }
+      // Photos matched by the park's Immich tag sit alongside the uploaded
+      // ones; they're relayed by the integration, so they sign the same way.
+      for (const assetId of park.immich_assets || []) {
+        const url = await this._signedPath(`/api/park_visits/immich/thumb/${assetId}`);
+        if (url) tiles.push({ park, filename: null, url });
       }
     }
     this._tiles = tiles;
     this._loaded = true;
   }
 
-  async _signedPhotoUrl(placeId, filename) {
+  async _signedPath(path) {
     // <img> can't send an auth header, so have HA sign the media path.
     try {
       const res = await this._hass.callWS({
         type: "auth/sign_path",
-        path: `/api/park_visits/photo/${placeId}/${filename}`,
+        path,
         expires: 3600,
       });
       return res.path;
@@ -164,7 +170,7 @@ class ParkVisitsGalleryCard extends HTMLElement {
     }
     if (!this._tiles.length) {
       status.textContent =
-        "No photos yet — add one when you review a park and it'll show up here.";
+        "No photos yet — upload one with a review, or tag a park's photos in Immich.";
       grid.innerHTML = "";
       return;
     }

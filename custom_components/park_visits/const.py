@@ -17,6 +17,10 @@ MIN_MAX_PARKS = 1
 MAX_MAX_PARKS = 200
 
 CONF_API_KEY = "api_key"
+# Optional: point at an Immich server to show a park's photos straight from
+# your own library instead of uploading copies into Home Assistant.
+CONF_IMMICH_URL = "immich_url"
+CONF_IMMICH_API_KEY = "immich_api_key"
 # Free text entered by the user (a suburb, city or address) — resolved to
 # CONF_LOCATION_NAME + latitude/longitude via Google Places Text Search
 # during the config/options flow, not typed in as coordinates.
@@ -96,6 +100,16 @@ URL_DETAILS = "/api/park_visits/details/{place_id}"
 URL_GOOGLE_PHOTO = "/api/park_visits/google_photo/{place_id}/{index}"
 URL_OUR_PHOTO = "/api/park_visits/photo/{place_id}/{filename}"
 URL_UPLOAD = "/api/park_visits/upload/{place_id}"
+URL_IMMICH_TAGS = "/api/park_visits/immich/tags"
+URL_IMMICH_THUMB = "/api/park_visits/immich/thumb/{asset_id}"
+
+# Immich
+IMMICH_TAG_KEY_TEMPLATE = f"{DOMAIN}_immich_tags_{{entry_id}}"
+IMMICH_MAX_ASSETS = 24
+IMMICH_TIMEOUT = 20
+SERVICE_SET_PARK_TAG = "set_park_tag"
+SERVICE_CLEAR_PARK_TAG = "clear_park_tag"
+SERVICE_ATTR_TAG_ID = "tag_id"
 
 # Cards locate these sensors by attribute rather than entity_id, which Home
 # Assistant may suffix or a user may rename.

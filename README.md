@@ -60,10 +60,14 @@ every visited park.
     attach photos, delete individual photos, or delete the whole review. The
     card's `columns` config controls which columns show (see
     [Family ratings](#family-ratings)), and `only_visited` / `show_progress`
-    power the Visited view.
+    power the Visited view. Set `show_upload: false` to hide the "Add photos"
+    field when a park's pictures come from Immich instead.
   - `park-visits-gallery-card` — a collage of every photo attached to a
-    review. Click one to see it large alongside the park name and our
-    review, and page through the rest.
+    review or matched by a park's Immich tag. Click one to see it large
+    alongside the park name and our review, and page through the rest.
+- Optionally pulls a park's photos straight from **Immich** by tag, so they
+  don't have to be uploaded into Home Assistant at all — see
+  [Photos from Immich](#photos-from-immich).
 
 ## How photos and reviews are handled
 
@@ -83,6 +87,38 @@ Your own uploaded photos are written to `<config>/park_visits_photos/<place_id>/
 and served through the same signed-path mechanism. Only the filenames are kept
 in the review store, since that file is held in memory and rewritten on every
 save.
+
+## Photos from Immich
+
+Uploading every park photo into Home Assistant adds up fast. If you already
+keep your library in [Immich](https://immich.app/), the integration can show a
+park's photos straight from there instead — nothing is copied, and nothing is
+written to disk.
+
+It works by **matching tags**. Tag the photos in Immich however you already
+do (one tag per park), then link that tag to the park:
+
+1. Put your Immich URL (e.g. `http://192.168.1.10:2283`) and an API key
+   (Immich → Account Settings → API Keys) into the Park Visits options.
+2. Open a park in the table card. Under **Photos from Immich**, pick the tag
+   whose photos belong to it.
+3. Every photo carrying that tag now shows on the park and in the gallery.
+
+The link is stored per `place_id`, so it survives refreshes and a park
+dropping out of the tracked list. Removing the tag (choose *— no tag —*)
+only unlinks it; the photos in Immich are never touched.
+
+The Immich API key is treated exactly like the Google one: it stays
+server-side, and thumbnails are relayed through the integration behind a
+short-lived signed URL. Leave the two Immich fields blank and none of this
+appears anywhere in the UI.
+
+Two services back it, if you'd rather script it: **`set_park_tag`**
+(`place_id`, `tag_id`) and **`clear_park_tag`** (`place_id`).
+
+With Immich supplying the pictures you can turn the upload field off entirely
+— set `show_upload: false` on the table card. Existing uploaded photos still
+display and can still be deleted; only the "Add photos" input goes away.
 
 ## Family ratings
 
@@ -146,7 +182,10 @@ the first time each review is loaded; there's no manual migration step.
    number of parks to show (default top 100). The location is resolved to
    coordinates automatically; if it can't be found, the form shows an error
    so you can try a more specific location.
-3. You can change any of this later via the integration's **Configure**
+3. Optionally fill in the **Immich URL** and **Immich API key** to pull park
+   photos from your own library — see [Photos from Immich](#photos-from-immich).
+   Leave both blank to skip it entirely.
+4. You can change any of this later via the integration's **Configure**
    button — this triggers a reload and regenerates the tracked parks.
 
 ### 4. Add the dashboard
@@ -217,7 +256,8 @@ custom_components/park_visits/
 ├── geocoding.py         # resolves a typed suburb/city/address to coordinates
 ├── coordinator.py      # tiled Google Places queries, ranking, review merging
 ├── storage.py          # persistent local reviews (place_id -> rating/liked/photos)
-├── views.py            # HTTP: Place Details, photo proxy, photo upload/serve
+├── views.py            # HTTP: Place Details, photo proxy, photo upload/serve, Immich tags/thumbs
+├── immich.py           # optional Immich client: list tags, find tagged assets, fetch thumbnails
 ├── frontend.py          # serves www/ and registers the cards on every dashboard
 ├── config_flow.py      # setup + options UI (API key, location, radius, count)
 ├── geo_location.py     # one GeolocationEvent entity per tracked park
@@ -227,7 +267,7 @@ custom_components/park_visits/
 ├── strings.json / translations/en.json
 └── www/
     ├── park-visits-table-card.js     # sortable table, park detail panel, review form
-    └── park-visits-gallery-card.js   # collage of our review photos
+    └── park-visits-gallery-card.js   # collage of review + Immich-tagged photos
 dashboards/
 └── park_visits_dashboard.yaml
 ```

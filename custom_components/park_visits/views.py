@@ -17,6 +17,7 @@ mints a short-lived HMAC-signed URL: the card requests one, drops it in the
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
@@ -44,7 +45,10 @@ from .const import (
     PLACES_API_DETAILS_FIELD_MASK,
     PLACES_API_DETAILS_URL,
     PLACES_API_PHOTO_URL,
+    URL_IMMICH_TAGS,
+    URL_IMMICH_THUMB,
 )
+from .immich import ImmichError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,6 +56,9 @@ _LOGGER = logging.getLogger(__name__)
 # are interpolated into URLs and used as directory names.
 _PLACE_ID_RE = re.compile(r"^[A-Za-z0-9_\-]{1,255}$")
 _FILENAME_RE = re.compile(r"^[a-f0-9]{32}\.(jpg|png|webp|gif)$")
+# Immich ids are UUIDs; kept loose enough to survive a format change, tight
+# enough that nothing here can be bent into a path or a query string.
+_IMMICH_ID_RE = re.compile(r"^[A-Za-z0-9\-]{1,64}$")
 
 
 def photo_dir(hass: HomeAssistant, place_id: str) -> str:
@@ -211,6 +218,39 @@ class ParkDetailsView(HomeAssistantView):
         review = data["reviews"].get(place_id)
         return list(review.photos) if review else []
 
+    async def _immich_payload(self, place_id: str) -> dict[str, Any]:
+        """This park's Immich tag and the photos carrying it.
+
+        Also read live, and never cached with the Google half — tagging a
+        photo in Immich should show up here on the next open, not tomorrow.
+        An Immich outage degrades to an error message rather than failing
+        the whole details request, since Google's data is still useful.
+        """
+        empty = {"configured": False, "tag_id": None, "tag_name": "", "assets": [], "error": None}
+        data = _entry_data(self.hass)
+        if not data:
+            return empty
+
+        client = data.get("immich")
+        mapping = data["tags"].get(place_id) if data.get("tags") else None
+        payload = {
+            **empty,
+            "configured": bool(client and client.configured),
+            "tag_id": (mapping or {}).get("tag_id"),
+            "tag_name": (mapping or {}).get("tag_name", ""),
+        }
+        if payload["configured"] and payload["tag_id"]:
+            try:
+                assets = await client.async_assets_for_tag(payload["tag_id"])
+                payload["assets"] = [
+                    {"id": a.id, "file_name": a.file_name, "taken_at": a.taken_at}
+                    for a in assets
+                ]
+            except ImmichError as err:
+                _LOGGER.warning("Immich lookup failed for %s: %s", place_id, err)
+                payload["error"] = str(err)
+        return payload
+
     async def get(self, request: web.Request, place_id: str) -> web.Response:
         if not _PLACE_ID_RE.match(place_id):
             return self.json_message("Invalid place_id", 400)
@@ -218,7 +258,12 @@ class ParkDetailsView(HomeAssistantView):
         cached = self._cache.get_fresh(place_id)
         if cached:
             return self.json(
-                {**cached.payload, "cached": True, "our_photos": self._our_photos(place_id)}
+                {
+                    **cached.payload,
+                    "cached": True,
+                    "our_photos": self._our_photos(place_id),
+                    "immich": await self._immich_payload(place_id),
+                }
             )
 
         api_key = _api_key(self.hass)
@@ -402,6 +447,77 @@ class UploadPhotoView(HomeAssistantView):
         return self.json({"filename": filename})
 
 
+class ImmichTagsView(HomeAssistantView):
+    """The tags defined on the Immich server, for the tag picker."""
+
+    url = URL_IMMICH_TAGS
+    name = "api:park_visits:immich_tags"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+
+    async def get(self, request: web.Request) -> web.Response:
+        data = _entry_data(self.hass)
+        if not data:
+            return self.json_message("Park Visits is not configured", 503)
+
+        client = data.get("immich")
+        if not client or not client.configured:
+            return self.json({"configured": False, "tags": []})
+
+        try:
+            tags = await client.async_list_tags()
+        except ImmichError as err:
+            _LOGGER.warning("Could not list Immich tags: %s", err)
+            return self.json({"configured": True, "tags": [], "error": str(err)})
+
+        return self.json(
+            {
+                "configured": True,
+                "tags": [{"id": tag.id, "name": tag.name} for tag in tags],
+            }
+        )
+
+
+class ImmichThumbView(HomeAssistantView):
+    """Relays an Immich thumbnail so the API key stays server-side.
+
+    Same reasoning as GooglePhotoView: an <img> can't send an API key, and
+    we wouldn't want it to. Reached via a signed path (requires_auth off).
+    """
+
+    url = URL_IMMICH_THUMB
+    name = "api:park_visits:immich_thumb"
+    requires_auth = False
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+
+    async def get(self, request: web.Request, asset_id: str) -> web.Response:
+        if not _IMMICH_ID_RE.match(asset_id):
+            return web.Response(status=400, text="Invalid asset id")
+
+        data = _entry_data(self.hass)
+        client = data.get("immich") if data else None
+        if not client or not client.configured:
+            return web.Response(status=503, text="Immich is not configured")
+
+        try:
+            body, content_type = await client.async_thumbnail(asset_id)
+        except ImmichError as err:
+            _LOGGER.warning("Immich thumbnail %s failed: %s", asset_id, err)
+            return web.Response(status=502, text="Could not load photo")
+
+        return web.Response(
+            body=body,
+            content_type=content_type,
+            # Immich asset ids are immutable, so the bytes behind one never
+            # change; cache hard to keep the gallery from re-fetching them.
+            headers={"Cache-Control": "private, max-age=86400"},
+        )
+
+
 class GalleryView(HomeAssistantView):
     """Every review that has photos, for the gallery card."""
 
@@ -424,28 +540,65 @@ class GalleryView(HomeAssistantView):
         if coordinator.data:
             live_names = {p.place_id: p.name for p in coordinator.data}
 
+        reviews = data["reviews"].all_reviews()
+        park_tags = data["tags"].all_tags() if data.get("tags") else {}
+        immich_assets = await self._async_immich_assets(data, park_tags)
+
+        # A park earns a place in the gallery if it has pictures from either
+        # source: an Immich-tagged park with no review still has photos worth
+        # showing, and clicking one should still name the park.
         items = []
-        for place_id, review in data["reviews"].all_reviews().items():
-            if not review.photos:
+        for place_id in dict.fromkeys([*reviews, *park_tags]):
+            review = reviews.get(place_id)
+            photos = list(review.photos) if review else []
+            assets = immich_assets.get(place_id, [])
+            if not photos and not assets:
                 continue
+            saved_name = review.park_name if review else ""
             items.append(
                 {
                     "place_id": place_id,
-                    "name": live_names.get(place_id) or review.park_name or "Unknown park",
-                    "overall_rating": review.overall_rating,
-                    "kids_rating": review.kids_rating,
-                    "mums_rating": review.mums_rating,
-                    "dads_rating": review.dads_rating,
-                    "liked": review.liked,
-                    "disliked": review.disliked,
-                    "note": review.note,
-                    "visit_date": review.visit_date or None,
-                    "photos": list(review.photos),
+                    "name": live_names.get(place_id) or saved_name or "Unknown park",
+                    "overall_rating": review.overall_rating if review else None,
+                    "kids_rating": review.kids_rating if review else None,
+                    "mums_rating": review.mums_rating if review else None,
+                    "dads_rating": review.dads_rating if review else None,
+                    "liked": review.liked if review else "",
+                    "disliked": review.disliked if review else "",
+                    "note": review.note if review else "",
+                    "visit_date": (review.visit_date or None) if review else None,
+                    "photos": photos,
+                    "immich_assets": assets,
                     "still_tracked": place_id in live_names,
                 }
             )
         items.sort(key=lambda i: i["visit_date"] or "", reverse=True)
         return self.json({"parks": items})
+
+    async def _async_immich_assets(
+        self, data: dict[str, Any], park_tags: dict[str, dict[str, str]]
+    ) -> dict[str, list[str]]:
+        """Asset ids per park, fetched in parallel (one Immich call per tag).
+
+        A failing tag yields no photos rather than sinking the gallery — the
+        uploaded ones are still worth rendering.
+        """
+        client = data.get("immich")
+        if not client or not client.configured or not park_tags:
+            return {}
+
+        place_ids = list(park_tags)
+
+        async def _for(place_id: str) -> list[str]:
+            try:
+                assets = await client.async_assets_for_tag(park_tags[place_id]["tag_id"])
+            except ImmichError as err:
+                _LOGGER.warning("Gallery: Immich lookup failed for %s: %s", place_id, err)
+                return []
+            return [asset.id for asset in assets]
+
+        results = await asyncio.gather(*(_for(place_id) for place_id in place_ids))
+        return dict(zip(place_ids, results))
 
 
 def async_register_views(hass: HomeAssistant) -> None:
@@ -456,3 +609,5 @@ def async_register_views(hass: HomeAssistant) -> None:
     hass.http.register_view(OurPhotoView(hass))
     hass.http.register_view(UploadPhotoView(hass))
     hass.http.register_view(GalleryView(hass))
+    hass.http.register_view(ImmichTagsView(hass))
+    hass.http.register_view(ImmichThumbView(hass))

@@ -3,12 +3,14 @@
     "step": {
       "user": {
         "title": "Set up Park Visits",
-        "description": "Enter your Google Places API key and a place to search around — a suburb, city or street address. It's resolved to a location automatically, so no coordinates needed.",
+        "description": "Enter your Google Places API key and a place to search around — a suburb, city or street address. It's resolved to a location automatically, so no coordinates needed. Optionally add an Immich server to show each park's photos from your own library instead of uploading copies.",
         "data": {
           "api_key": "Google Places API key",
           "location": "Location (suburb, city or address)",
           "radius_km": "Radius (km)",
-          "max_parks": "Number of parks to show"
+          "max_parks": "Number of parks to show",
+          "immich_url": "Immich server URL (optional)",
+          "immich_api_key": "Immich API key (optional)"
         }
       }
     },
@@ -27,12 +29,14 @@
     "step": {
       "init": {
         "title": "Park Visits options",
-        "description": "Adjust the API key, search location, radius or number of parks shown.",
+        "description": "Adjust the API key, search location, radius, number of parks shown, or the optional Immich server used for park photos.",
         "data": {
           "api_key": "Google Places API key",
           "location": "Location (suburb, city or address)",
           "radius_km": "Radius (km)",
-          "max_parks": "Number of parks to show"
+          "max_parks": "Number of parks to show",
+          "immich_url": "Immich server URL (optional)",
+          "immich_api_key": "Immich API key (optional)"
         }
       }
     },

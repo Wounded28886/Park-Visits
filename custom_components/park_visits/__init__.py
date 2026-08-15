@@ -15,6 +15,8 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 
 from .const import (
+    CONF_IMMICH_API_KEY,
+    CONF_IMMICH_URL,
     DOMAIN,
     MAX_OUR_RATING,
     MIN_OUR_RATING,
@@ -30,17 +32,21 @@ from .const import (
     SERVICE_ATTR_PLACE_ID,
     SERVICE_ATTR_PLAYGROUND_RATING,
     SERVICE_ATTR_SCENERY_RATING,
+    SERVICE_ATTR_TAG_ID,
     SERVICE_ATTR_VISIT_DATE,
     SERVICE_ATTR_WILDLIFE_RATING,
     SERVICE_CLEAR_NEXT_PARK,
+    SERVICE_CLEAR_PARK_TAG,
     SERVICE_DELETE_PHOTO,
     SERVICE_DELETE_REVIEW,
     SERVICE_RATE_PARK,
     SERVICE_SET_NEXT_PARK,
+    SERVICE_SET_PARK_TAG,
 )
 from .coordinator import ParkVisitsCoordinator
 from .frontend import async_register_frontend
-from .storage import ParkListCache, ParkPlanStore, ParkReviewStore
+from .immich import ImmichClient, ImmichError
+from .storage import ParkListCache, ParkPlanStore, ParkReviewStore, ParkTagStore
 from .views import async_delete_photo_files, async_register_views
 
 PLATFORMS = ["geo_location", "sensor", "button"]
@@ -81,6 +87,15 @@ DELETE_PHOTO_SCHEMA = vol.Schema(
     }
 )
 
+SET_PARK_TAG_SCHEMA = vol.Schema(
+    {
+        vol.Required(SERVICE_ATTR_PLACE_ID): cv.string,
+        vol.Required(SERVICE_ATTR_TAG_ID): cv.string,
+    }
+)
+
+CLEAR_PARK_TAG_SCHEMA = vol.Schema({vol.Required(SERVICE_ATTR_PLACE_ID): cv.string})
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Park Visits from a config entry."""
@@ -98,9 +113,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not await coordinator.async_load_cached():
         await coordinator.async_config_entry_first_refresh()
 
+    # Immich is optional: with no URL/key configured the client reports
+    # itself unconfigured and every Immich code path degrades to "no photos"
+    # rather than erroring.
+    park_tags = ParkTagStore(hass, entry.entry_id)
+    await park_tags.async_load()
+    immich = ImmichClient(
+        hass,
+        entry.options.get(CONF_IMMICH_URL, ""),
+        entry.options.get(CONF_IMMICH_API_KEY, ""),
+    )
+
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "coordinator": coordinator,
         "reviews": reviews,
+        "tags": park_tags,
+        "immich": immich,
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -149,6 +177,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def _async_handle_clear_next_park(call: ServiceCall) -> None:
         await coordinator.async_clear_next_park()
 
+    async def _async_handle_set_park_tag(call: ServiceCall) -> None:
+        place_id = call.data[SERVICE_ATTR_PLACE_ID]
+        tag_id = call.data[SERVICE_ATTR_TAG_ID]
+        if not immich.configured:
+            raise HomeAssistantError(
+                "No Immich server is configured — add its URL and API key in "
+                "the Park Visits options before tagging parks"
+            )
+        # Resolve the name now so the UI can still label the tag when Immich
+        # is unreachable later. A lookup failure isn't fatal: the id is the
+        # part that actually matters.
+        tag_name = ""
+        try:
+            tag_name = next(
+                (tag.name for tag in await immich.async_list_tags() if tag.id == tag_id), ""
+            )
+        except ImmichError as err:
+            raise HomeAssistantError(f"Could not reach Immich: {err}") from err
+        if not tag_name:
+            raise HomeAssistantError(f"Immich has no tag with id '{tag_id}'")
+        await park_tags.async_set(place_id, tag_id, tag_name)
+
+    async def _async_handle_clear_park_tag(call: ServiceCall) -> None:
+        await park_tags.async_clear(call.data[SERVICE_ATTR_PLACE_ID])
+
     async def _async_handle_delete_photo(call: ServiceCall) -> None:
         place_id = call.data[SERVICE_ATTR_PLACE_ID]
         filename = call.data[SERVICE_ATTR_FILENAME]
@@ -182,6 +235,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_CLEAR_NEXT_PARK,
             _async_handle_clear_next_park,
             schema=CLEAR_NEXT_PARK_SCHEMA,
+        )
+        hass.services.async_register(
+            DOMAIN, SERVICE_SET_PARK_TAG, _async_handle_set_park_tag, schema=SET_PARK_TAG_SCHEMA
+        )
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_CLEAR_PARK_TAG,
+            _async_handle_clear_park_tag,
+            schema=CLEAR_PARK_TAG_SCHEMA,
         )
 
     # Views are global rather than per-entry, and HA raises if the same view
@@ -222,4 +284,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.services.async_remove(DOMAIN, SERVICE_DELETE_PHOTO)
             hass.services.async_remove(DOMAIN, SERVICE_SET_NEXT_PARK)
             hass.services.async_remove(DOMAIN, SERVICE_CLEAR_NEXT_PARK)
+            hass.services.async_remove(DOMAIN, SERVICE_SET_PARK_TAG)
+            hass.services.async_remove(DOMAIN, SERVICE_CLEAR_PARK_TAG)
     return unload_ok

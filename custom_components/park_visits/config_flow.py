@@ -12,6 +12,8 @@ from homeassistant.core import callback
 
 from .const import (
     CONF_API_KEY,
+    CONF_IMMICH_API_KEY,
+    CONF_IMMICH_URL,
     CONF_LOCATION,
     CONF_LOCATION_NAME,
     CONF_MAX_PARKS,
@@ -55,6 +57,13 @@ def _schema(defaults: dict[str, Any], *, require_key: bool) -> vol.Schema:
             vol.Required(CONF_MAX_PARKS, default=defaults[CONF_MAX_PARKS]): vol.All(
                 vol.Coerce(int), vol.Range(min=MIN_MAX_PARKS, max=MAX_MAX_PARKS)
             ),
+            # Optional: leave blank to keep photos local-upload only.
+            vol.Optional(
+                CONF_IMMICH_URL, default=defaults.get(CONF_IMMICH_URL, "")
+            ): str,
+            vol.Optional(
+                CONF_IMMICH_API_KEY, default=defaults.get(CONF_IMMICH_API_KEY, "")
+            ): str,
         }
     )
 
@@ -172,6 +181,8 @@ class ParkVisitsOptionsFlow(config_entries.OptionsFlow):
             CONF_LOCATION: self.config_entry.options.get(CONF_LOCATION, ""),
             CONF_RADIUS_KM: self.config_entry.options.get(CONF_RADIUS_KM, DEFAULT_RADIUS_KM),
             CONF_MAX_PARKS: self.config_entry.options.get(CONF_MAX_PARKS, DEFAULT_MAX_PARKS),
+            CONF_IMMICH_URL: self.config_entry.options.get(CONF_IMMICH_URL, ""),
+            CONF_IMMICH_API_KEY: self.config_entry.options.get(CONF_IMMICH_API_KEY, ""),
         }
         return self.async_show_form(
             step_id="init",
