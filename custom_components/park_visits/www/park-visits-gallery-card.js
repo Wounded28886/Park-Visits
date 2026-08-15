@@ -34,13 +34,23 @@ class ParkVisitsGalleryCard extends HTMLElement {
     super();
     this._items = [];
     this._tiles = [];
+    // The subset currently on screen. The lightbox pages through this, not
+    // _tiles, so "next" follows what you can actually see.
+    this._visible = [];
     this._openIndex = null;
     this._loaded = false;
     this._error = null;
+    this._parkFilter = "";
+    this._tagFilter = "";
   }
 
   setConfig(config) {
-    this.config = { title: "Our park photos", columns: null, ...config };
+    this.config = {
+      title: "Our park photos",
+      columns: null,
+      show_filter: true,
+      ...config,
+    };
     this._built = false;
     if (this.isConnected) this._build();
   }
@@ -95,6 +105,7 @@ class ParkVisitsGalleryCard extends HTMLElement {
     this.innerHTML = `
       <ha-card header="${escapeHtml(this.config.title)}">
         <div class="card-content">
+          ${this.config.show_filter ? `<div class="pvg-filters"></div>` : ""}
           <div class="pvg-status">Loading…</div>
           <div class="pvg-grid"></div>
         </div>
@@ -121,7 +132,104 @@ class ParkVisitsGalleryCard extends HTMLElement {
     }
     this._lastPhotoTotal = this._photoCountFromStates(this._hass);
     await this._buildTiles();
+    this._renderFilters();
     this._renderGrid();
+  }
+
+  /**
+   * Park and tag pickers, rebuilt from whatever the gallery currently holds.
+   *
+   * The tag picker only appears once something is actually tagged — with no
+   * Immich server there's nothing to pick from, and an empty dropdown would
+   * just be clutter.
+   */
+  _renderFilters() {
+    const host = this.querySelector(".pvg-filters");
+    if (!host) return;
+
+    const parks = this._items
+      .map((p) => ({ id: p.place_id, name: p.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const tags = [...new Set(this._items.map((p) => p.immich_tag).filter(Boolean))].sort(
+      (a, b) => a.localeCompare(b)
+    );
+
+    // A filter whose target has since disappeared would hide everything with
+    // no way back, so drop selections that no longer exist.
+    if (this._parkFilter && !parks.some((p) => p.id === this._parkFilter)) {
+      this._parkFilter = "";
+    }
+    if (this._tagFilter && !tags.includes(this._tagFilter)) this._tagFilter = "";
+
+    const option = (value, label, selected) =>
+      `<option value="${escapeHtml(value)}"${selected ? " selected" : ""}>${escapeHtml(
+        label
+      )}</option>`;
+
+    host.innerHTML = `
+      <label class="pvg-filter-field">
+        <span>Park</span>
+        <select class="pvg-park-filter">
+          ${option("", "All parks", !this._parkFilter)}
+          ${parks.map((p) => option(p.id, p.name, p.id === this._parkFilter)).join("")}
+        </select>
+      </label>
+      ${
+        tags.length
+          ? `<label class="pvg-filter-field">
+               <span>Immich tag</span>
+               <select class="pvg-tag-filter">
+                 ${option("", "All tags", !this._tagFilter)}
+                 ${tags.map((t) => option(t, t, t === this._tagFilter)).join("")}
+               </select>
+             </label>`
+          : ""
+      }
+      ${
+        this._parkFilter || this._tagFilter
+          ? `<button class="pvg-filter-clear">Clear</button>`
+          : ""
+      }`;
+
+    const onChange = (key) => (ev) => {
+      this[key] = ev.target.value;
+      // Indices are into the visible set, so a stale lightbox would be
+      // pointing at the wrong photo.
+      this._closeLightbox();
+      this._renderFilters();
+      this._renderGrid();
+    };
+    const parkSelect = host.querySelector(".pvg-park-filter");
+    if (parkSelect) parkSelect.addEventListener("change", onChange("_parkFilter"));
+    const tagSelect = host.querySelector(".pvg-tag-filter");
+    if (tagSelect) tagSelect.addEventListener("change", onChange("_tagFilter"));
+    const clear = host.querySelector(".pvg-filter-clear");
+    if (clear) {
+      clear.addEventListener("click", () => {
+        this._parkFilter = "";
+        this._tagFilter = "";
+        this._closeLightbox();
+        this._renderFilters();
+        this._renderGrid();
+      });
+    }
+  }
+
+  /**
+   * Tiles matching the current filters.
+   *
+   * Filtering by tag keeps only photos that actually carry it — the Immich
+   * ones. A park's uploaded photos aren't tagged in Immich at all, so
+   * including them under a tag filter would be a lie.
+   */
+  _filteredTiles() {
+    return this._tiles.filter((tile) => {
+      if (this._parkFilter && tile.park.place_id !== this._parkFilter) return false;
+      if (this._tagFilter && !(tile.fullPath && tile.park.immich_tag === this._tagFilter)) {
+        return false;
+      }
+      return true;
+    });
   }
 
   async _buildTiles() {
@@ -196,11 +304,21 @@ class ParkVisitsGalleryCard extends HTMLElement {
       return;
     }
 
-    status.textContent = `${this._tiles.length} photo${
-      this._tiles.length === 1 ? "" : "s"
-    } across ${this._items.length} park${this._items.length === 1 ? "" : "s"}`;
+    this._visible = this._filteredTiles();
+    if (!this._visible.length) {
+      status.textContent = "No photos match that filter.";
+      grid.innerHTML = "";
+      return;
+    }
 
-    grid.innerHTML = this._tiles
+    const parkCount = new Set(this._visible.map((t) => t.park.place_id)).size;
+    const filtered = this._visible.length !== this._tiles.length;
+    status.textContent =
+      `${this._visible.length} photo${this._visible.length === 1 ? "" : "s"}` +
+      ` across ${parkCount} park${parkCount === 1 ? "" : "s"}` +
+      (filtered ? ` (of ${this._tiles.length})` : "");
+
+    grid.innerHTML = this._visible
       .map(
         (tile, index) => `
         <button class="pvg-tile" data-index="${index}" title="${escapeHtml(
@@ -230,7 +348,7 @@ class ParkVisitsGalleryCard extends HTMLElement {
     this._renderLightbox();
     // Tiles are the small Immich size; swap in the full preview once its
     // signed URL arrives, so opening a photo doesn't wait on it.
-    const tile = this._tiles[index];
+    const tile = this._visible[index];
     if (tile && tile.fullPath && !tile.fullUrl) {
       this._signedPath(tile.fullPath).then((url) => {
         if (!url || this._openIndex !== index) return;
@@ -248,14 +366,14 @@ class ParkVisitsGalleryCard extends HTMLElement {
   _renderLightbox() {
     const root = this.querySelector(".pvg-dialog-root");
     if (!root) return;
-    if (this._openIndex == null || !this._tiles[this._openIndex]) {
+    if (this._openIndex == null || !this._visible[this._openIndex]) {
       root.innerHTML = "";
       return;
     }
-    const tile = this._tiles[this._openIndex];
+    const tile = this._visible[this._openIndex];
     const { park } = tile;
     const url = tile.fullUrl || tile.url;
-    const many = this._tiles.length > 1;
+    const many = this._visible.length > 1;
 
     const ratingLine = (label, value) =>
       value != null ? `<div><strong>${label}:</strong> ${escapeHtml(value)}/10</div>` : "";
@@ -294,7 +412,7 @@ class ParkVisitsGalleryCard extends HTMLElement {
                 ? `<div class="pvg-nav">
                      <button class="pvg-prev">‹ Previous</button>
                      <span class="pvg-muted">${this._openIndex + 1} of ${
-                    this._tiles.length
+                    this._visible.length
                   }</span>
                      <button class="pvg-next">Next ›</button>
                    </div>`
@@ -312,11 +430,11 @@ class ParkVisitsGalleryCard extends HTMLElement {
     const next = root.querySelector(".pvg-next");
     if (prev)
       prev.addEventListener("click", () =>
-        this._openLightbox((this._openIndex - 1 + this._tiles.length) % this._tiles.length)
+        this._openLightbox((this._openIndex - 1 + this._visible.length) % this._visible.length)
       );
     if (next)
       next.addEventListener("click", () =>
-        this._openLightbox((this._openIndex + 1) % this._tiles.length)
+        this._openLightbox((this._openIndex + 1) % this._visible.length)
       );
   }
 
@@ -327,6 +445,23 @@ class ParkVisitsGalleryCard extends HTMLElement {
 
 const STYLES = `
 <style>
+  .pvg-filters {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-bottom: 10px;
+  }
+  .pvg-filter-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .pvg-filter-field span { font-size: 12px; opacity: 0.7; }
+  .pvg-filters select {
+    padding: 6px; font: inherit; border-radius: 6px; max-width: 260px;
+    border: 1px solid var(--divider-color, #333);
+    background: var(--primary-background-color, #111); color: var(--primary-text-color, #eee);
+  }
+  .pvg-filter-clear {
+    padding: 7px 12px; font: inherit; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--divider-color, #333);
+    background: var(--secondary-background-color, #2a2a2a);
+    color: var(--primary-text-color, #eee);
+  }
+  .pvg-filter-clear:hover { border-color: var(--primary-color, #03a9f4); }
   .pvg-status { font-size: 13px; opacity: 0.7; margin-bottom: 10px; }
   .pvg-grid {
     display: grid; gap: 8px;

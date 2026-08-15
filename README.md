@@ -63,8 +63,10 @@ every visited park.
     power the Visited view. Set `show_upload: false` to hide the "Add photos"
     field when a park's pictures come from Immich instead.
   - `park-visits-gallery-card` — a collage of every photo attached to a
-    review or matched by a park's Immich tag. Click one to see it large
-    alongside the park name and our review, and page through the rest.
+    review or matched by a park's Immich tag, filterable by park and by
+    Immich tag (`show_filter: false` hides the filter bar). Click one to see
+    it large alongside the park name and our review, and page through the
+    rest — paging follows whatever the filter has narrowed things to.
 - Optionally pulls a park's photos straight from **Immich** by tag, so they
   don't have to be uploaded into Home Assistant at all — see
   [Photos from Immich](#photos-from-immich).

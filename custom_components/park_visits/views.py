@@ -572,6 +572,9 @@ class GalleryView(HomeAssistantView):
                     "visit_date": (review.visit_date or None) if review else None,
                     "photos": photos,
                     "immich_assets": assets,
+                    # Named so the gallery can offer a filter by tag as well
+                    # as by park; empty for parks with no Immich link.
+                    "immich_tag": (park_tags.get(place_id) or {}).get("tag_name", ""),
                     "still_tracked": place_id in live_names,
                 }
             )
