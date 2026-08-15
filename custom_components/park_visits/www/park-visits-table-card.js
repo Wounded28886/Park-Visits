@@ -190,6 +190,9 @@ class ParkVisitsTableCard extends HTMLElement {
     this._photoItems = [];
     this._lightboxIndex = null;
     this._progressSignature = null;
+    // Immich's tag list barely changes, so it's fetched once per card and
+    // reused by every park popup rather than on each open.
+    this._immichTags = null;
   }
 
   setConfig(config) {
@@ -202,6 +205,9 @@ class ParkVisitsTableCard extends HTMLElement {
       only_visited: false,
       show_progress: false,
       show_status_strip: true,
+      // Turn off to hide the "Add photos" upload field — useful once a park's
+      // pictures come from an Immich tag and don't need copying into HA.
+      show_upload: true,
       ...config,
     };
     const keys =
@@ -483,6 +489,8 @@ class ParkVisitsTableCard extends HTMLElement {
       this._detailsError ? "err" : "ok",
       (this._googlePhotoUrls || []).length,
       (this._ourPhotoUrls || []).length,
+      (this._immichPhotoUrls || []).length,
+      this._details && this._details.immich ? this._details.immich.tag_id : "-",
       this._formOpen ? "form" : "noform",
       this._pendingReview ? JSON.stringify(this._pendingReview) : "-",
       // So the "Set as next visit" button reflects the current selection.
@@ -727,8 +735,22 @@ class ParkVisitsTableCard extends HTMLElement {
       this._detailsError =
         "Couldn't load Google details for this park. Our own review is still shown below.";
     }
-    await this._loadPhotoUrls(placeId);
+    await Promise.all([this._loadPhotoUrls(placeId), this._loadImmichTags()]);
     this._renderDialog();
+  }
+
+  async _loadImmichTags() {
+    // Only worth asking once, and only when a server is actually configured.
+    if (this._immichTags) return;
+    const immich = this._details && this._details.immich;
+    if (!immich || !immich.configured) return;
+    try {
+      const result = await this._hass.callApi("GET", "park_visits/immich/tags");
+      this._immichTags = (result && result.tags) || [];
+    } catch (err) {
+      // Not fatal: the popup still shows everything else, minus the picker.
+      this._immichTags = null;
+    }
   }
 
   async _loadPhotoUrls(placeId) {
@@ -761,6 +783,15 @@ class ParkVisitsTableCard extends HTMLElement {
       const url = await sign(`/api/park_visits/photo/${placeId}/${filename}`);
       if (url) this._ourPhotoUrls.push({ filename, url });
     }
+
+    // Photos carrying this park's Immich tag. Same signing dance: the bytes
+    // are relayed by the integration so the Immich key stays server-side.
+    this._immichPhotoUrls = [];
+    const assets = (this._details && this._details.immich && this._details.immich.assets) || [];
+    for (const asset of assets) {
+      const url = await sign(`/api/park_visits/immich/thumb/${asset.id}`);
+      if (url) this._immichPhotoUrls.push(url);
+    }
   }
 
   _closeDialog() {
@@ -768,6 +799,7 @@ class ParkVisitsTableCard extends HTMLElement {
     this._details = null;
     this._googlePhotoUrls = [];
     this._ourPhotoUrls = [];
+    this._immichPhotoUrls = [];
     this._formOpen = false;
     this._renderedSignature = null;
     this._pendingReview = null;
@@ -831,11 +863,18 @@ class ParkVisitsTableCard extends HTMLElement {
     // Combined so a click can open one lightbox that pages through every
     // photo shown on this park — our uploads first, then Google's, matching
     // the order they appear in the page below.
+    const immich = (d && d.immich) || {};
+    const tagName = immich.tag_name || "";
     this._photoItems = [
       ...(this._ourPhotoUrls || []).map((p) => ({ url: p.url, source: "Our photo" })),
+      ...(this._immichPhotoUrls || []).map((u) => ({
+        url: u,
+        source: tagName ? `Immich · ${tagName}` : "Immich photo",
+      })),
       ...(this._googlePhotoUrls || []).map((u) => ({ url: u, source: "Google photo" })),
     ];
     const ourCount = (this._ourPhotoUrls || []).length;
+    const immichCount = (this._immichPhotoUrls || []).length;
     const ourPhotos = (this._ourPhotoUrls || [])
       .map(
         (p, i) =>
@@ -844,11 +883,19 @@ class ParkVisitsTableCard extends HTMLElement {
           )}" loading="lazy" alt="">`
       )
       .join("");
-    const googlePhotos = (this._googlePhotoUrls || [])
+    const immichPhotos = (this._immichPhotoUrls || [])
       .map(
         (u, i) =>
           `<img class="pv-photo pv-photo-click" data-index="${
             ourCount + i
+          }" src="${escapeHtml(u)}" loading="lazy" alt="">`
+      )
+      .join("");
+    const googlePhotos = (this._googlePhotoUrls || [])
+      .map(
+        (u, i) =>
+          `<img class="pv-photo pv-photo-click" data-index="${
+            ourCount + immichCount + i
           }" src="${escapeHtml(u)}" loading="lazy" alt="">`
       )
       .join("");
@@ -956,6 +1003,8 @@ class ParkVisitsTableCard extends HTMLElement {
             ${ourReview}
             ${ourPhotos ? `<div class="pv-photos">${ourPhotos}</div>` : ""}
 
+            ${this._immichSectionHtml(immich, immichPhotos)}
+
             ${
               googlePhotos
                 ? `<h3>Photos from Google</h3><div class="pv-photos">${googlePhotos}</div>`
@@ -1062,8 +1111,101 @@ class ParkVisitsTableCard extends HTMLElement {
       });
     }
 
+    this._wireTagPicker(root, a.place_id);
+
     const form = root.querySelector(".pv-form");
     if (form) this._wireForm(form, a, hasOurReview);
+  }
+
+  /**
+   * "Photos from Immich" — the tag picker plus whatever it matched.
+   *
+   * Nothing renders at all unless an Immich server is configured, so a
+   * setup that doesn't use one sees no trace of the feature.
+   */
+  _immichSectionHtml(immich, immichPhotos) {
+    if (!immich || !immich.configured) return "";
+
+    const tags = this._immichTags;
+    const current = immich.tag_id || "";
+    let picker;
+    if (tags && tags.length) {
+      const options = [
+        `<option value=""${current ? "" : " selected"}>— no tag —</option>`,
+        ...tags.map(
+          (t) =>
+            `<option value="${escapeHtml(t.id)}"${
+              t.id === current ? " selected" : ""
+            }>${escapeHtml(t.name)}</option>`
+        ),
+      ].join("");
+      picker = `<select class="pv-tag-select">${options}</select>`;
+    } else if (tags) {
+      picker = `<span class="muted">Immich has no tags yet — create one there first.</span>`;
+    } else {
+      // Tag list unavailable (Immich unreachable): still name the tag we
+      // have on file, just without the ability to change it.
+      picker = `<span class="muted">${
+        immich.tag_name
+          ? `Tagged ${escapeHtml(immich.tag_name)} (Immich is unreachable)`
+          : "Couldn't load tags from Immich."
+      }</span>`;
+    }
+
+    let photos;
+    if (immich.error) {
+      photos = `<div class="pv-warn">${escapeHtml(immich.error)}</div>`;
+    } else if (immichPhotos) {
+      photos = `<div class="pv-photos">${immichPhotos}</div>`;
+    } else if (current) {
+      photos = `<div class="muted">No photos carry this tag yet.</div>`;
+    } else {
+      photos = `<div class="muted">Pick the Immich tag you use for this park and its photos will show up here.</div>`;
+    }
+
+    return `
+      <h3>Photos from Immich</h3>
+      <div class="pv-tagrow">
+        <label>Tag</label>
+        ${picker}
+        <span class="pv-tag-status muted"></span>
+      </div>
+      ${photos}`;
+  }
+
+  _wireTagPicker(root, placeId) {
+    const select = root.querySelector(".pv-tag-select");
+    if (!select) return;
+    const status = root.querySelector(".pv-tag-status");
+
+    select.addEventListener("change", async () => {
+      if (this._busy) return;
+      const tagId = select.value;
+      this._busy = true;
+      select.disabled = true;
+      status.textContent = "Saving…";
+      try {
+        if (tagId) {
+          await this._hass.callService("park_visits", "set_park_tag", {
+            place_id: placeId,
+            tag_id: tagId,
+          });
+        } else {
+          await this._hass.callService("park_visits", "clear_park_tag", {
+            place_id: placeId,
+          });
+        }
+        // Re-read so the matched photos below reflect the new tag.
+        await this._reloadDetails(placeId);
+        this._renderedSignature = null;
+        this._renderDialog();
+      } catch (err) {
+        status.textContent = `Couldn't save: ${err && err.message ? err.message : err}`;
+        select.disabled = false;
+      } finally {
+        this._busy = false;
+      }
+    });
   }
 
   _formHtml(a, hasOurReview) {
@@ -1113,8 +1255,12 @@ class ParkVisitsTableCard extends HTMLElement {
         <label>Other notes</label>
         <textarea name="note" rows="3">${escapeHtml(a.our_note || "")}</textarea>
         ${existing ? `<label>Photos</label><div class="pv-photos">${existing}</div>` : ""}
-        <label>Add photos</label>
-        <input type="file" name="photo" accept="image/*" multiple>
+        ${
+          this.config.show_upload
+            ? `<label>Add photos</label>
+        <input type="file" name="photo" accept="image/*" multiple>`
+            : ""
+        }
         <div class="pv-form-actions">
           <button type="submit" class="pv-btn">Save review</button>
           <button type="button" class="pv-btn pv-secondary pv-cancel">Cancel</button>
@@ -1259,7 +1405,8 @@ class ParkVisitsTableCard extends HTMLElement {
           },
         };
 
-        const files = form.photo.files ? Array.from(form.photo.files) : [];
+        // form.photo is absent entirely when show_upload is off.
+        const files = form.photo && form.photo.files ? Array.from(form.photo.files) : [];
         const failedUploads = [];
         for (let i = 0; i < files.length; i++) {
           status.textContent =
@@ -1459,6 +1606,16 @@ const STYLES = `
     margin-top: 10px; padding: 8px 10px; border-radius: 6px; font-size: 13px;
     background: var(--secondary-background-color, #2a2a2a);
   }
+  .pv-tagrow {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;
+  }
+  .pv-tagrow label { font-size: 13px; color: var(--secondary-text-color, #9e9e9e); }
+  .pv-tag-select {
+    padding: 6px; font: inherit; border-radius: 6px;
+    border: 1px solid var(--divider-color, #333);
+    background: var(--primary-background-color, #111); color: var(--primary-text-color, #eee);
+  }
+  .pv-tag-status { font-size: 12px; }
   .pv-photos { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
   .pv-photo {
     height: 130px; border-radius: 8px; object-fit: cover; flex: 0 0 auto;

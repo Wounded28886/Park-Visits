@@ -165,3 +165,35 @@ delete_photo:
       required: true
       selector:
         text:
+
+set_park_tag:
+  name: Link a park to an Immich tag
+  description: >-
+    Match a park with a tag in your Immich library. Photos carrying that tag
+    are then shown for the park, so there's no need to upload copies.
+  fields:
+    place_id:
+      name: Park
+      description: The Google place_id of the park.
+      required: true
+      selector:
+        text:
+    tag_id:
+      name: Immich tag
+      description: The id of the Immich tag whose photos belong to this park.
+      required: true
+      selector:
+        text:
+
+clear_park_tag:
+  name: Unlink a park's Immich tag
+  description: >-
+    Stop showing Immich photos for a park. The photos themselves are left
+    untouched in Immich.
+  fields:
+    place_id:
+      name: Park
+      description: The Google place_id of the park.
+      required: true
+      selector:
+        text:

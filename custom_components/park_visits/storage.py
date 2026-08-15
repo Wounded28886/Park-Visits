@@ -19,6 +19,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import (
+    IMMICH_TAG_KEY_TEMPLATE,
     PARKS_CACHE_KEY_TEMPLATE,
     PLAN_KEY_TEMPLATE,
     STORAGE_KEY_TEMPLATE,
@@ -282,3 +283,42 @@ class ParkListCache:
 
     async def async_save(self, fingerprint: str, parks: list[dict[str, Any]]) -> None:
         await self._store.async_save({"fingerprint": fingerprint, "parks": parks})
+
+
+class ParkTagStore:
+    """Maps a park to the Immich tag whose photos belong to it.
+
+    Stored per place_id so the link survives a park dropping out of the
+    tracked list and coming back. The tag *name* is kept alongside its id
+    purely so the UI can label things when Immich is unreachable.
+    """
+
+    def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
+        self._store: Store = Store(
+            hass, STORAGE_VERSION, IMMICH_TAG_KEY_TEMPLATE.format(entry_id=entry_id)
+        )
+        self._tags: dict[str, dict[str, str]] = {}
+
+    async def async_load(self) -> None:
+        raw = await self._store.async_load()
+        if raw:
+            self._tags = {
+                place_id: value
+                for place_id, value in raw.items()
+                if isinstance(value, dict) and value.get("tag_id")
+            }
+
+    def get(self, place_id: str) -> dict[str, str] | None:
+        tag = self._tags.get(place_id)
+        return dict(tag) if tag else None
+
+    def all_tags(self) -> dict[str, dict[str, str]]:
+        return {place_id: dict(tag) for place_id, tag in self._tags.items()}
+
+    async def async_set(self, place_id: str, tag_id: str, tag_name: str = "") -> None:
+        self._tags[place_id] = {"tag_id": tag_id, "tag_name": tag_name}
+        await self._store.async_save(self._tags)
+
+    async def async_clear(self, place_id: str) -> None:
+        if self._tags.pop(place_id, None) is not None:
+            await self._store.async_save(self._tags)
