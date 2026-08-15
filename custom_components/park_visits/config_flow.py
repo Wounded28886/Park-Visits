@@ -13,17 +13,21 @@ from homeassistant.core import callback
 from .const import (
     CONF_API_KEY,
     CONF_IMMICH_API_KEY,
+    CONF_IMMICH_MAX_ASSETS,
     CONF_IMMICH_URL,
     CONF_LOCATION,
     CONF_LOCATION_NAME,
     CONF_MAX_PARKS,
     CONF_RADIUS_KM,
+    DEFAULT_IMMICH_MAX_ASSETS,
     DEFAULT_MAX_PARKS,
     DEFAULT_NAME,
     DEFAULT_RADIUS_KM,
     DOMAIN,
+    MAX_IMMICH_MAX_ASSETS,
     MAX_MAX_PARKS,
     MAX_RADIUS_KM,
+    MIN_IMMICH_MAX_ASSETS,
     MIN_MAX_PARKS,
     MIN_RADIUS_KM,
 )
@@ -64,6 +68,13 @@ def _schema(defaults: dict[str, Any], *, require_key: bool) -> vol.Schema:
             vol.Optional(
                 CONF_IMMICH_API_KEY, default=defaults.get(CONF_IMMICH_API_KEY, "")
             ): str,
+            vol.Optional(
+                CONF_IMMICH_MAX_ASSETS,
+                default=defaults.get(CONF_IMMICH_MAX_ASSETS, DEFAULT_IMMICH_MAX_ASSETS),
+            ): vol.All(
+                vol.Coerce(int),
+                vol.Range(min=MIN_IMMICH_MAX_ASSETS, max=MAX_IMMICH_MAX_ASSETS),
+            ),
         }
     )
 
@@ -183,6 +194,9 @@ class ParkVisitsOptionsFlow(config_entries.OptionsFlow):
             CONF_MAX_PARKS: self.config_entry.options.get(CONF_MAX_PARKS, DEFAULT_MAX_PARKS),
             CONF_IMMICH_URL: self.config_entry.options.get(CONF_IMMICH_URL, ""),
             CONF_IMMICH_API_KEY: self.config_entry.options.get(CONF_IMMICH_API_KEY, ""),
+            CONF_IMMICH_MAX_ASSETS: self.config_entry.options.get(
+                CONF_IMMICH_MAX_ASSETS, DEFAULT_IMMICH_MAX_ASSETS
+            ),
         }
         return self.async_show_form(
             step_id="init",

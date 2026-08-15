@@ -39,6 +39,7 @@ from .const import (
     DETAILS_CACHE_HOURS,
     DOMAIN,
     GOOGLE_PHOTO_MAX_WIDTH,
+    IMMICH_THUMB_SIZES,
     MAX_GOOGLE_PHOTOS,
     MAX_UPLOAD_BYTES,
     PHOTO_DIR_NAME,
@@ -494,9 +495,11 @@ class ImmichThumbView(HomeAssistantView):
     def __init__(self, hass: HomeAssistant) -> None:
         self.hass = hass
 
-    async def get(self, request: web.Request, asset_id: str) -> web.Response:
+    async def get(self, request: web.Request, size: str, asset_id: str) -> web.Response:
         if not _IMMICH_ID_RE.match(asset_id):
             return web.Response(status=400, text="Invalid asset id")
+        if size not in IMMICH_THUMB_SIZES:
+            return web.Response(status=400, text="Invalid size")
 
         data = _entry_data(self.hass)
         client = data.get("immich") if data else None
@@ -504,7 +507,7 @@ class ImmichThumbView(HomeAssistantView):
             return web.Response(status=503, text="Immich is not configured")
 
         try:
-            body, content_type = await client.async_thumbnail(asset_id)
+            body, content_type = await client.async_thumbnail(asset_id, size)
         except ImmichError as err:
             _LOGGER.warning("Immich thumbnail %s failed: %s", asset_id, err)
             return web.Response(status=502, text="Could not load photo")

@@ -193,6 +193,10 @@ class ParkVisitsTableCard extends HTMLElement {
     // Immich's tag list barely changes, so it's fetched once per card and
     // reused by every park popup rather than on each open.
     this._immichTags = null;
+    // Signed full-size URLs, keyed by the path they were signed from.
+    // _photoItems is rebuilt on every render, so this can't live on the
+    // items themselves — and it doubles as a cache when paging back.
+    this._fullUrls = {};
   }
 
   setConfig(config) {
@@ -753,45 +757,65 @@ class ParkVisitsTableCard extends HTMLElement {
     }
   }
 
-  async _loadPhotoUrls(placeId) {
-    // <img> can't send an auth header, so ask HA to sign each media path.
-    const sign = async (path) => {
-      try {
-        const res = await this._hass.callWS({
-          type: "auth/sign_path",
-          path,
-          expires: 3600,
-        });
-        return res.path;
-      } catch (err) {
-        return null;
-      }
-    };
-
-    this._googlePhotoUrls = [];
-    const count = (this._details && this._details.photo_count) || 0;
-    for (let i = 0; i < count; i++) {
-      const url = await sign(`/api/park_visits/google_photo/${placeId}/${i}`);
-      if (url) this._googlePhotoUrls.push(url);
+  /** Ask HA to sign one media path (an <img> can't send an auth header). */
+  async _sign(path) {
+    try {
+      const res = await this._hass.callWS({
+        type: "auth/sign_path",
+        path,
+        expires: 3600,
+      });
+      return res.path;
+    } catch (err) {
+      return null;
     }
+  }
 
-    this._ourPhotoUrls = [];
+  /**
+   * Sign many paths at once.
+   *
+   * Each signature is a WebSocket round-trip, so signing a tagged park's
+   * photos one after another would take seconds over a remote connection —
+   * a park with 135 photos would stall the popup entirely. Fired together,
+   * the whole set costs about as much as one.
+   */
+  async _signAll(paths) {
+    return Promise.all(paths.map((p) => this._sign(p)));
+  }
+
+  async _loadPhotoUrls(placeId) {
+    const count = (this._details && this._details.photo_count) || 0;
+    const googlePaths = Array.from(
+      { length: count },
+      (_, i) => `/api/park_visits/google_photo/${placeId}/${i}`
+    );
     // Filenames come from the details endpoint, which reads them live from
     // the review store (so a just-uploaded photo appears immediately).
     const filenames = (this._details && this._details.our_photos) || [];
-    for (const filename of filenames) {
-      const url = await sign(`/api/park_visits/photo/${placeId}/${filename}`);
-      if (url) this._ourPhotoUrls.push({ filename, url });
-    }
-
     // Photos carrying this park's Immich tag. Same signing dance: the bytes
     // are relayed by the integration so the Immich key stays server-side.
-    this._immichPhotoUrls = [];
+    // Only the small size is signed here — the lightbox fetches the full
+    // preview for the one photo actually being looked at.
     const assets = (this._details && this._details.immich && this._details.immich.assets) || [];
-    for (const asset of assets) {
-      const url = await sign(`/api/park_visits/immich/thumb/${asset.id}`);
-      if (url) this._immichPhotoUrls.push(url);
-    }
+
+    const [googleUrls, ourUrls, immichUrls] = await Promise.all([
+      this._signAll(googlePaths),
+      this._signAll(filenames.map((f) => `/api/park_visits/photo/${placeId}/${f}`)),
+      this._signAll(
+        assets.map((a) => `/api/park_visits/immich/thumb/thumbnail/${a.id}`)
+      ),
+    ]);
+
+    this._googlePhotoUrls = googleUrls.filter(Boolean);
+    this._ourPhotoUrls = filenames
+      .map((filename, i) => ({ filename, url: ourUrls[i] }))
+      .filter((p) => p.url);
+    this._immichPhotoUrls = assets
+      .map((asset, i) => ({
+        url: immichUrls[i],
+        fullPath: `/api/park_visits/immich/thumb/preview/${asset.id}`,
+      }))
+      .filter((p) => p.url);
   }
 
   _closeDialog() {
@@ -800,6 +824,7 @@ class ParkVisitsTableCard extends HTMLElement {
     this._googlePhotoUrls = [];
     this._ourPhotoUrls = [];
     this._immichPhotoUrls = [];
+    this._fullUrls = {};
     this._formOpen = false;
     this._renderedSignature = null;
     this._pendingReview = null;
@@ -811,6 +836,17 @@ class ParkVisitsTableCard extends HTMLElement {
   _openLightbox(index) {
     this._lightboxIndex = index;
     this._renderDialog();
+    // Grid tiles are the small Immich size; the full preview is fetched only
+    // for the photo actually being looked at. Show the tile immediately and
+    // swap in the bigger version when its signed URL lands.
+    const item = (this._photoItems || [])[index];
+    if (item && item.fullPath && !this._fullUrls[item.fullPath]) {
+      this._sign(item.fullPath).then((url) => {
+        if (!url) return;
+        this._fullUrls[item.fullPath] = url;
+        if (this._lightboxIndex === index) this._renderDialog();
+      });
+    }
   }
 
   _closeLightbox() {
@@ -827,7 +863,7 @@ class ParkVisitsTableCard extends HTMLElement {
       <div class="pv-lb-backdrop">
         <div class="pv-lb-dialog" role="dialog" aria-modal="true">
           <button class="pv-lb-close" title="Close">✕</button>
-          <img class="pv-lb-full" src="${escapeHtml(item.url)}" alt="">
+          <img class="pv-lb-full" src="${escapeHtml(item.fullUrl || item.url)}" alt="">
           <div class="pv-lb-nav">
             ${many ? `<button class="pv-lb-prev">‹ Previous</button>` : ""}
             <span class="muted">${escapeHtml(item.source)}${
@@ -867,8 +903,10 @@ class ParkVisitsTableCard extends HTMLElement {
     const tagName = immich.tag_name || "";
     this._photoItems = [
       ...(this._ourPhotoUrls || []).map((p) => ({ url: p.url, source: "Our photo" })),
-      ...(this._immichPhotoUrls || []).map((u) => ({
-        url: u,
+      ...(this._immichPhotoUrls || []).map((p) => ({
+        url: p.url,
+        fullPath: p.fullPath,
+        fullUrl: this._fullUrls[p.fullPath],
         source: tagName ? `Immich · ${tagName}` : "Immich photo",
       })),
       ...(this._googlePhotoUrls || []).map((u) => ({ url: u, source: "Google photo" })),
@@ -885,10 +923,10 @@ class ParkVisitsTableCard extends HTMLElement {
       .join("");
     const immichPhotos = (this._immichPhotoUrls || [])
       .map(
-        (u, i) =>
+        (p, i) =>
           `<img class="pv-photo pv-photo-click" data-index="${
             ourCount + i
-          }" src="${escapeHtml(u)}" loading="lazy" alt="">`
+          }" src="${escapeHtml(p.url)}" loading="lazy" alt="">`
       )
       .join("");
     const googlePhotos = (this._googlePhotoUrls || [])

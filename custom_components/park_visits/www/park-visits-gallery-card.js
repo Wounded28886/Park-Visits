@@ -127,20 +127,41 @@ class ParkVisitsGalleryCard extends HTMLElement {
   async _buildTiles() {
     // One flat list of photos across all parks, each remembering which park
     // it came from so the lightbox can show that review.
-    const tiles = [];
+    // Every path is signed in one burst rather than one after another: a
+    // gallery spanning a few tagged parks can run to hundreds of photos, and
+    // each signature is its own WebSocket round-trip.
+    const pending = [];
     for (const park of this._items) {
       for (const filename of park.photos) {
-        const url = await this._signedPath(`/api/park_visits/photo/${park.place_id}/${filename}`);
-        if (url) tiles.push({ park, filename, url });
+        pending.push({
+          park,
+          filename,
+          path: `/api/park_visits/photo/${park.place_id}/${filename}`,
+        });
       }
       // Photos matched by the park's Immich tag sit alongside the uploaded
       // ones; they're relayed by the integration, so they sign the same way.
+      // Tiles use Immich's small size; the lightbox fetches the full preview
+      // for the single photo being opened.
       for (const assetId of park.immich_assets || []) {
-        const url = await this._signedPath(`/api/park_visits/immich/thumb/${assetId}`);
-        if (url) tiles.push({ park, filename: null, url });
+        pending.push({
+          park,
+          filename: null,
+          path: `/api/park_visits/immich/thumb/thumbnail/${assetId}`,
+          fullPath: `/api/park_visits/immich/thumb/preview/${assetId}`,
+        });
       }
     }
-    this._tiles = tiles;
+
+    const urls = await Promise.all(pending.map((p) => this._signedPath(p.path)));
+    this._tiles = pending
+      .map((p, i) => ({
+        park: p.park,
+        filename: p.filename,
+        url: urls[i],
+        fullPath: p.fullPath,
+      }))
+      .filter((t) => t.url);
     this._loaded = true;
   }
 
@@ -207,6 +228,16 @@ class ParkVisitsGalleryCard extends HTMLElement {
   _openLightbox(index) {
     this._openIndex = index;
     this._renderLightbox();
+    // Tiles are the small Immich size; swap in the full preview once its
+    // signed URL arrives, so opening a photo doesn't wait on it.
+    const tile = this._tiles[index];
+    if (tile && tile.fullPath && !tile.fullUrl) {
+      this._signedPath(tile.fullPath).then((url) => {
+        if (!url || this._openIndex !== index) return;
+        tile.fullUrl = url;
+        this._renderLightbox();
+      });
+    }
   }
 
   _closeLightbox() {
@@ -221,7 +252,9 @@ class ParkVisitsGalleryCard extends HTMLElement {
       root.innerHTML = "";
       return;
     }
-    const { park, url } = this._tiles[this._openIndex];
+    const tile = this._tiles[this._openIndex];
+    const { park } = tile;
+    const url = tile.fullUrl || tile.url;
     const many = this._tiles.length > 1;
 
     const ratingLine = (label, value) =>

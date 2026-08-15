@@ -16,7 +16,7 @@ import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import IMMICH_MAX_ASSETS, IMMICH_TIMEOUT
+from .const import DEFAULT_IMMICH_MAX_ASSETS, IMMICH_TIMEOUT
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -67,10 +67,17 @@ def _base(url: str) -> str:
 class ImmichClient:
     """Talks to one Immich server."""
 
-    def __init__(self, hass: HomeAssistant, url: str, api_key: str) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        url: str,
+        api_key: str,
+        max_assets: int = DEFAULT_IMMICH_MAX_ASSETS,
+    ) -> None:
         self._hass = hass
         self._base = _base(url)
         self._api_key = (api_key or "").strip()
+        self._max_assets = max_assets
 
     @property
     def configured(self) -> bool:
@@ -128,7 +135,7 @@ class ImmichClient:
             "/search/metadata",
             json_body={
                 "tagIds": [tag_id],
-                "size": IMMICH_MAX_ASSETS,
+                "size": self._max_assets,
                 "order": "desc",
                 "type": "IMAGE",
             },
@@ -144,8 +151,14 @@ class ImmichClient:
             if item.get("id")
         ]
 
-    async def async_thumbnail(self, asset_id: str) -> tuple[bytes, str]:
-        """Raw thumbnail bytes plus content type, for relaying to the browser."""
+    async def async_thumbnail(
+        self, asset_id: str, size: str = "preview"
+    ) -> tuple[bytes, str]:
+        """Raw image bytes plus content type, for relaying to the browser.
+
+        ``size`` is Immich's own: "thumbnail" for grid tiles, "preview" for
+        anything shown large.
+        """
         if not self.configured:
             raise ImmichError("Immich is not configured")
         session = async_get_clientsession(self._hass)
@@ -153,7 +166,7 @@ class ImmichClient:
         try:
             async with session.get(
                 url,
-                params={"size": "preview"},
+                params={"size": size},
                 headers={"x-api-key": self._api_key},
                 timeout=aiohttp.ClientTimeout(total=IMMICH_TIMEOUT),
                 allow_redirects=False,

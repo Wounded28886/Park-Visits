@@ -21,6 +21,7 @@ CONF_API_KEY = "api_key"
 # your own library instead of uploading copies into Home Assistant.
 CONF_IMMICH_URL = "immich_url"
 CONF_IMMICH_API_KEY = "immich_api_key"
+CONF_IMMICH_MAX_ASSETS = "immich_max_assets"
 # Free text entered by the user (a suburb, city or address) — resolved to
 # CONF_LOCATION_NAME + latitude/longitude via Google Places Text Search
 # during the config/options flow, not typed in as coordinates.
@@ -101,11 +102,23 @@ URL_GOOGLE_PHOTO = "/api/park_visits/google_photo/{place_id}/{index}"
 URL_OUR_PHOTO = "/api/park_visits/photo/{place_id}/{filename}"
 URL_UPLOAD = "/api/park_visits/upload/{place_id}"
 URL_IMMICH_TAGS = "/api/park_visits/immich/tags"
-URL_IMMICH_THUMB = "/api/park_visits/immich/thumb/{asset_id}"
+URL_IMMICH_THUMB = "/api/park_visits/immich/thumb/{size}/{asset_id}"
 
 # Immich
 IMMICH_TAG_KEY_TEMPLATE = f"{DOMAIN}_immich_tags_{{entry_id}}"
-IMMICH_MAX_ASSETS = 24
+# How many tagged photos to show per park. A day out can easily produce a
+# hundred-plus, so the default sits well above "a handful" — it's a guard
+# against a tag that turns out to hold the whole library, not a display
+# limit. Grid tiles load the small size lazily, so a high cap costs little.
+# The ceiling is Immich's own maximum page size for a metadata search.
+DEFAULT_IMMICH_MAX_ASSETS = 250
+MIN_IMMICH_MAX_ASSETS = 1
+MAX_IMMICH_MAX_ASSETS = 1000
+# Immich renders two sizes per asset: a small square-ish thumbnail (~19KB)
+# and a full-width preview (~370KB). Grids use the former, the lightbox the
+# latter — a 20x difference that decides whether a 135-photo park is usable
+# over mobile data.
+IMMICH_THUMB_SIZES = ("thumbnail", "preview")
 IMMICH_TIMEOUT = 20
 SERVICE_SET_PARK_TAG = "set_park_tag"
 SERVICE_CLEAR_PARK_TAG = "clear_park_tag"

@@ -10,7 +10,8 @@
           "radius_km": "Radius (km)",
           "max_parks": "Number of parks to show",
           "immich_url": "Immich server URL (optional)",
-          "immich_api_key": "Immich API key (optional)"
+          "immich_api_key": "Immich API key (optional)",
+          "immich_max_assets": "Max Immich photos per park"
         }
       }
     },
@@ -36,7 +37,8 @@
           "radius_km": "Radius (km)",
           "max_parks": "Number of parks to show",
           "immich_url": "Immich server URL (optional)",
-          "immich_api_key": "Immich API key (optional)"
+          "immich_api_key": "Immich API key (optional)",
+          "immich_max_assets": "Max Immich photos per park"
         }
       }
     },

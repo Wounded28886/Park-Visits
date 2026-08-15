@@ -113,6 +113,15 @@ The link is stored per `place_id`, so it survives refreshes and a park
 dropping out of the tracked list. Removing the tag (choose *— no tag —*)
 only unlinks it; the photos in Immich are never touched.
 
+**Max Immich photos per park** in the options controls how many tagged
+photos a park shows — 250 by default, up to 1000 (Immich's own page-size
+ceiling). Grid tiles load Immich's small thumbnail (~19KB) lazily and the full preview
+(~370KB) is fetched only for the photo you actually open — a 20x difference
+that's what makes a 135-photo park workable over a phone connection. Every
+thumbnail needs its own signed URL, so they're all signed in one parallel
+burst; done one at a time, a large tag would stall the popup for seconds on
+a remote connection.
+
 The Immich API key is treated exactly like the Google one: it stays
 server-side, and thumbnails are relayed through the integration behind a
 short-lived signed URL. Leave the two Immich fields blank and none of this
@@ -188,8 +197,9 @@ the first time each review is loaded; there's no manual migration step.
    coordinates automatically; if it can't be found, the form shows an error
    so you can try a more specific location.
 3. Optionally fill in the **Immich URL** and **Immich API key** to pull park
-   photos from your own library — see [Photos from Immich](#photos-from-immich).
-   Leave both blank to skip it entirely.
+   photos from your own library, and **Max Immich photos per park** to cap how
+   many each park shows — see [Photos from Immich](#photos-from-immich).
+   Leave the URL and key blank to skip it entirely.
 4. You can change any of this later via the integration's **Configure**
    button — this triggers a reload and regenerates the tracked parks.
 

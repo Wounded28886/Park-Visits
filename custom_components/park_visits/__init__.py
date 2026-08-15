@@ -16,7 +16,9 @@ from homeassistant.helpers import config_validation as cv
 
 from .const import (
     CONF_IMMICH_API_KEY,
+    CONF_IMMICH_MAX_ASSETS,
     CONF_IMMICH_URL,
+    DEFAULT_IMMICH_MAX_ASSETS,
     DOMAIN,
     MAX_OUR_RATING,
     MIN_OUR_RATING,
@@ -122,6 +124,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass,
         entry.options.get(CONF_IMMICH_URL, ""),
         entry.options.get(CONF_IMMICH_API_KEY, ""),
+        entry.options.get(CONF_IMMICH_MAX_ASSETS, DEFAULT_IMMICH_MAX_ASSETS),
     )
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
