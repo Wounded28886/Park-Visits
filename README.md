@@ -100,6 +100,11 @@ do (one tag per park), then link that tag to the park:
 
 1. Put your Immich URL (e.g. `http://192.168.1.10:2283`) and an API key
    (Immich → Account Settings → API Keys) into the Park Visits options.
+   Use an address that reaches Immich **directly** — a public hostname sitting
+   behind Cloudflare Access, Authelia or a similar login portal will bounce
+   the API call to a sign-in page, since those don't know about Immich's
+   `x-api-key`. Home Assistant is usually on the same network as Immich, so
+   the LAN address is both simpler and faster.
 2. Open a park in the table card. Under **Photos from Immich**, pick the tag
    whose photos belong to it.
 3. Every photo carrying that tag now shows on the park and in the gallery.

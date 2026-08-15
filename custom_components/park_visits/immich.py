@@ -38,6 +38,22 @@ class ImmichAsset:
     taken_at: str | None
 
 
+def _redirect_error(location: str) -> ImmichError:
+    """A 3xx from the API means something is standing in front of Immich.
+
+    Typically a reverse proxy with its own auth (Cloudflare Access, Authelia,
+    a login portal): it bounces the request to a sign-in page, and the
+    x-api-key header means nothing to it. Following the redirect would just
+    yield HTML and a baffling parse error, so say what actually happened.
+    """
+    host = location.split("/")[2] if "//" in location else location
+    return ImmichError(
+        f"The Immich URL redirected to {host} — something in front of Immich "
+        "(a login portal or access proxy) is intercepting API calls. Use an "
+        "address that reaches Immich directly, such as its LAN address."
+    )
+
+
 def _base(url: str) -> str:
     """Normalise the configured server URL to a bare origin."""
     url = (url or "").strip().rstrip("/")
@@ -78,7 +94,10 @@ class ImmichClient:
                 json=json_body,
                 headers={"x-api-key": self._api_key, "Accept": "application/json"},
                 timeout=aiohttp.ClientTimeout(total=IMMICH_TIMEOUT),
+                allow_redirects=False,
             ) as response:
+                if 300 <= response.status < 400:
+                    raise _redirect_error(response.headers.get("Location", ""))
                 if response.status in (401, 403):
                     raise ImmichError("Immich rejected the API key")
                 if response.status != 200:
@@ -137,7 +156,10 @@ class ImmichClient:
                 params={"size": "preview"},
                 headers={"x-api-key": self._api_key},
                 timeout=aiohttp.ClientTimeout(total=IMMICH_TIMEOUT),
+                allow_redirects=False,
             ) as response:
+                if 300 <= response.status < 400:
+                    raise _redirect_error(response.headers.get("Location", ""))
                 if response.status != 200:
                     raise ImmichError(f"Thumbnail returned {response.status}")
                 return (
