@@ -42,7 +42,12 @@
  */
 
 function escapeHtml(value) {
-  return String(value ?? "").replace(
+  // `!= null` (not `??`) deliberately — nullish coalescing is ES2020 and
+  // throws a hard SyntaxError on the old WebKit embedded in things like
+  // Samsung Family Hub fridge displays, which kills the whole script before
+  // customElements.define() ever runs. Same reasoning at every other `??`
+  // site in this file and in park-visits-gallery-card.js.
+  return String(value != null ? value : "").replace(
     /[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
   );
@@ -85,7 +90,7 @@ const ALL_COLUMNS = [
     label: "#",
     numeric: true,
     value: (s) => s.attributes.rank,
-    display: (s) => s.attributes.rank ?? "—",
+    display: (s) => (s.attributes.rank != null ? s.attributes.rank : "—"),
   },
   {
     key: "name",
@@ -1265,7 +1270,7 @@ class ParkVisitsTableCard extends HTMLElement {
       <div class="pv-rating-field">
         <label>${label}${required ? " *" : ""}</label>
         <input type="number" name="${name}" min="0" max="10" step="0.5"
-               value="${escapeHtml(value ?? "")}" ${required ? "required" : ""}>
+               value="${escapeHtml(value != null ? value : "")}" ${required ? "required" : ""}>
       </div>`;
 
     return `
@@ -1428,13 +1433,16 @@ class ParkVisitsTableCard extends HTMLElement {
           kidsRating: submitted.kids_rating,
           values: {
             our_kids_rating: submitted.kids_rating,
-            our_mums_rating: submitted.mums_rating ?? null,
-            our_dads_rating: submitted.dads_rating ?? null,
-            our_playground_rating: submitted.playground_rating ?? null,
-            our_scenery_rating: submitted.scenery_rating ?? null,
-            our_wildlife_rating: submitted.wildlife_rating ?? null,
-            our_facilities_rating: submitted.facilities_rating ?? null,
-            our_parking_rating: submitted.parking_rating ?? null,
+            our_mums_rating: submitted.mums_rating != null ? submitted.mums_rating : null,
+            our_dads_rating: submitted.dads_rating != null ? submitted.dads_rating : null,
+            our_playground_rating:
+              submitted.playground_rating != null ? submitted.playground_rating : null,
+            our_scenery_rating: submitted.scenery_rating != null ? submitted.scenery_rating : null,
+            our_wildlife_rating:
+              submitted.wildlife_rating != null ? submitted.wildlife_rating : null,
+            our_facilities_rating:
+              submitted.facilities_rating != null ? submitted.facilities_rating : null,
+            our_parking_rating: submitted.parking_rating != null ? submitted.parking_rating : null,
             our_overall_rating: overallRating,
             our_liked: submitted.liked,
             our_disliked: submitted.disliked,

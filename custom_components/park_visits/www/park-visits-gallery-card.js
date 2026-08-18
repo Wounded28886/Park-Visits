@@ -15,7 +15,11 @@
  */
 
 function escapeHtml(value) {
-  return String(value ?? "").replace(
+  // `!= null` (not `??`) deliberately — nullish coalescing is ES2020 and
+  // throws a hard SyntaxError on old embedded browsers (e.g. Samsung Family
+  // Hub fridge displays), which kills the whole script before
+  // customElements.define() ever runs.
+  return String(value != null ? value : "").replace(
     /[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
   );
