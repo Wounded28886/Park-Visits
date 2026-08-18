@@ -1,0 +1,226 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Park Visits — browser probe</title>
+<!--
+  Diagnostic page for working out why the cards fail on an old embedded
+  browser (Samsung Family Hub, smart TVs, kiosk panels).
+
+  Deliberately written in ES3: var, function expressions, string
+  concatenation, no classes, no arrows, no template literals. If this page
+  itself failed to run, it would tell us nothing about the cards.
+
+  Served unauthenticated from the integration's static path, so a device
+  that can't log in to Home Assistant can still load it:
+      http://<home-assistant>:8123/park_visits_frontend/probe.html
+-->
+<style>
+  body {
+    font-family: sans-serif; background: #111; color: #eee;
+    margin: 0; padding: 16px; font-size: 20px; line-height: 1.45;
+  }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 21px; margin: 20px 0 6px; border-bottom: 1px solid #444; }
+  .row { padding: 2px 0; }
+  .yes { color: #6ddf6d; }
+  .no  { color: #ff7b7b; font-weight: bold; }
+  .ua  { font-size: 15px; color: #aaa; word-break: break-all; }
+  #errors { color: #ff7b7b; font-size: 17px; white-space: pre-wrap; word-break: break-word; }
+  .hint { color: #ffd479; font-size: 17px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>Park Visits browser probe</h1>
+<div class="ua" id="ua"></div>
+
+<h2>1. Card load result</h2>
+<div id="cardresult">Loading the table card…</div>
+<div id="errors"></div>
+
+<h2>2. JavaScript features</h2>
+<div id="js"></div>
+
+<h2>3. CSS features</h2>
+<div id="css"></div>
+
+<script>
+/* Everything below is ES3. No let/const, arrows, or template literals. */
+(function () {
+  var errorBox = document.getElementById("errors");
+  var seenError = false;
+
+  function show(box, label, ok, detail) {
+    var div = document.createElement("div");
+    div.className = "row";
+    div.innerHTML =
+      '<span class="' + (ok ? "yes" : "no") + '">' + (ok ? "OK  " : "FAIL") +
+      "</span>  " + label + (detail ? '  <span class="ua">' + detail + "</span>" : "");
+    box.appendChild(div);
+  }
+
+  document.getElementById("ua").appendChild(
+    document.createTextNode(navigator.userAgent)
+  );
+
+  /* Catch the parse/run error from the card module. This is the whole point
+     of the page: the message and line number name the exact construct the
+     engine chokes on. */
+  window.onerror = function (message, source, line, column) {
+    seenError = true;
+    var where = source ? String(source).split("/").pop() : "unknown file";
+    errorBox.appendChild(
+      document.createTextNode(
+        "\n" + message + "\n    in " + where + " at line " + line +
+        (column ? ", column " + column : "") + "\n"
+      )
+    );
+    document.getElementById("cardresult").innerHTML =
+      '<span class="no">FAIL</span>  the card did not load — details below';
+    return false;
+  };
+
+  /* --- JavaScript feature probes -------------------------------------- */
+  /* eval() so a syntax error is caught here instead of killing the page. */
+  function syntaxWorks(code) {
+    try {
+      eval(code);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  var jsBox = document.getElementById("js");
+  var jsTests = [
+    ["ES2015  class",                  "(function(){ var C = eval('(class {})'); })()"],
+    ["ES2015  arrow function",         "eval('(()=>1)')"],
+    ["ES2015  template literal",       "eval('`x`')"],
+    ["ES2015  let / const",            "eval('let a = 1; const b = 2;')"],
+    ["ES2015  default+rest params",    "eval('(function f(a=1, ...r){})')"],
+    ["ES2015  destructuring",          "eval('var {a} = {a:1}; var [b] = [2];')"],
+    ["ES2015  for...of",               "eval('for (var x of [1]) {}')"],
+    ["ES2016  exponent **",            "eval('2 ** 3')"],
+    ["ES2017  async / await",          "eval('(async function(){ await 1; })')"],
+    ["ES2018  object spread {...x}",   "eval('var o = {...{a:1}};')"],
+    ["ES2018  async iteration",        "eval('(async function(){ for await (var x of []) {} })')"],
+    ["ES2019  catch without binding",  "eval('try { } catch { }')"],
+    ["ES2020  optional chaining ?.",   "eval('var o = {}; o?.a;')"],
+    ["ES2020  nullish ??",             "eval('null ?? 1')"],
+    ["ES2020  dynamic import()",       "eval('(function(){ return function(){ return import(\"./x.js\"); }; })')"],
+    ["ES2021  logical assignment ||=", "eval('var a = 0; a ||= 1;')"],
+    ["ES2022  class fields",           "eval('(class { x = 1; })')"]
+  ];
+  for (var i = 0; i < jsTests.length; i++) {
+    show(jsBox, jsTests[i][0], syntaxWorks(jsTests[i][1]));
+  }
+
+  /* Runtime APIs the cards actually call. */
+  function apiWorks(fn) {
+    try { return !!fn(); } catch (e) { return false; }
+  }
+  var apiTests = [
+    ["customElements.define", function () { return window.customElements && window.customElements.define; }],
+    ["ES modules (script type=module)", function () {
+      var s = document.createElement("script");
+      return "noModule" in s;
+    }],
+    ["Promise",        function () { return window.Promise; }],
+    ["fetch",          function () { return window.fetch; }],
+    ["Set",            function () { return window.Set; }],
+    ["Array.from",     function () { return Array.from; }],
+    ["Object.values",  function () { return Object.values; }],
+    ["Object.assign",  function () { return Object.assign; }],
+    ["String.includes",function () { return "".includes; }],
+    ["Number.isNaN",   function () { return Number.isNaN; }],
+    ["localeCompare",  function () { return "".localeCompare; }],
+    ["FormData",       function () { return window.FormData; }],
+    ["WebSocket",      function () { return window.WebSocket; }]
+  ];
+  for (var j = 0; j < apiTests.length; j++) {
+    show(jsBox, apiTests[j][0], apiWorks(apiTests[j][1]));
+  }
+
+  /* --- CSS feature probes ---------------------------------------------- */
+  var cssBox = document.getElementById("css");
+  /* `prop` is the real CSS name (kebab-case) — CSS.supports rejects the
+     camelCase DOM spelling, which the style fallback needs instead. */
+  function cssWorks(prop, value) {
+    if (window.CSS && window.CSS.supports) {
+      try { return window.CSS.supports(prop, value); } catch (e) { /* fall through */ }
+    }
+    var camel = prop.replace(/-([a-z])/g, function (m, c) { return c.toUpperCase(); });
+    var el = document.createElement("div");
+    try {
+      el.style[camel] = value;
+      return el.style[camel] !== "";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /* Flex gap needs a real layout test, not CSS.supports: engines from
+     Chromium 66-83 support `gap` on grid (so supports() says yes) while
+     ignoring it on flex — which is precisely the range in question here. */
+  function flexGapWorks() {
+    var box = document.createElement("div");
+    box.style.display = "flex";
+    box.style.flexDirection = "column";
+    box.style.rowGap = "10px";
+    box.style.position = "absolute";
+    box.style.visibility = "hidden";
+    box.appendChild(document.createElement("div"));
+    box.appendChild(document.createElement("div"));
+    document.body.appendChild(box);
+    var ok = box.scrollHeight === 10;
+    box.parentNode.removeChild(box);
+    return ok;
+  }
+  show(cssBox, "flexbox gap  (used for spacing everywhere)", flexGapWorks());
+  show(cssBox, "aspect-ratio  (gallery tiles)", cssWorks("aspect-ratio", "1 / 1"));
+  show(cssBox, "position: sticky  (table header)", cssWorks("position", "sticky"));
+  show(cssBox, "CSS variables  (all theming)",
+    !!(window.CSS && window.CSS.supports && window.CSS.supports("--a", "0")));
+  show(cssBox, "object-fit  (photo thumbnails)", cssWorks("object-fit", "cover"));
+
+  /* --- Finally, try to load the real card ------------------------------ */
+  var probe = document.createElement("script");
+  probe.type = "module";
+  probe.src = "/park_visits_frontend/park-visits-table-card.js?probe=" + new Date().getTime();
+  probe.onerror = function () {
+    seenError = true;
+    document.getElementById("cardresult").innerHTML =
+      '<span class="no">FAIL</span>  the browser could not fetch or run the card file';
+  };
+  document.head.appendChild(probe);
+
+  /* Whether the element registered is the real answer — a syntax error stops
+     the module before customElements.define() at the bottom of the file. */
+  setTimeout(function () {
+    var defined = !!(window.customElements && window.customElements.get &&
+                     window.customElements.get("park-visits-table-card"));
+    if (defined) {
+      document.getElementById("cardresult").innerHTML =
+        '<span class="yes">OK</span>  the card loaded and registered — ' +
+        "so this is NOT a JavaScript problem. Check the CSS section below, " +
+        "and check that the fridge is not showing a cached copy of the page.";
+    } else if (!seenError) {
+      document.getElementById("cardresult").innerHTML =
+        '<span class="no">FAIL</span>  the card did not register, and no error ' +
+        "was reported. The engine may be blocking ES modules entirely — " +
+        "check the 'ES modules' line below.";
+    }
+    var hint = document.createElement("div");
+    hint.className = "hint";
+    hint.appendChild(document.createTextNode(
+      "Read the FAIL lines above out to Claude — the first failing item is the one that matters."
+    ));
+    document.getElementById("cardresult").appendChild(hint);
+  }, 4000);
+})();
+</script>
+
+</body>
+</html>
