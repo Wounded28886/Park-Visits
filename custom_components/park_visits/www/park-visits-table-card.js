@@ -1833,3 +1833,16 @@ window.customCards.push({
   name: "Park Visits Table",
   description: "Sortable park table with detail panel, Google reviews and our own review form.",
 });
+
+// On a slow device the dashboard can render before this file has loaded,
+// leaving Home Assistant showing "Custom element doesn't exist" for a card
+// that now works fine. Imported dynamically and only after the define above:
+// a static import is fetched before any of this module runs, which would
+// delay registration and make that race more likely, not less.
+// Carry this file's own ?v= across, so the shared module is cache-busted by
+// the same version bump as the cards — the static path sets a long max-age.
+import(`./park-visits-late-load.js${new URL(import.meta.url).search}`)
+  .then((m) => m.scheduleRebuild())
+  .catch(() => {
+    /* Recovery is a bonus; the card is already registered without it. */
+  });
