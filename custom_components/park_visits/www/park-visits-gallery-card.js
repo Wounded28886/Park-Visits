@@ -529,13 +529,3 @@ window.customCards.push({
   name: "Park Visits Gallery",
   description: "Collage of photos from our park reviews.",
 });
-
-// See the table card: recovers from Home Assistant having already given up
-// on this card because the module loaded after the dashboard rendered.
-// Carry this file's own ?v= across, so the shared module is cache-busted by
-// the same version bump as the cards — the static path sets a long max-age.
-import(`./park-visits-late-load.js${new URL(import.meta.url).search}`)
-  .then((m) => m.scheduleRebuild())
-  .catch(() => {
-    /* Recovery is a bonus; the card is already registered without it. */
-  });

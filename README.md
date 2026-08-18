@@ -285,7 +285,6 @@ custom_components/park_visits/
 └── www/
     ├── park-visits-table-card.js     # sortable table, park detail panel, review form
     ├── park-visits-gallery-card.js   # collage of review + Immich-tagged photos
-    ├── park-visits-late-load.js      # repairs cards HA gave up on (slow devices)
     └── probe.html                    # browser diagnostic for old embedded displays
 dashboards/
 └── park_visits_dashboard.yaml
