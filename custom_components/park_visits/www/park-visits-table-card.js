@@ -250,10 +250,36 @@ class ParkVisitsTableCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    this._renderRows();
-    this._renderStatusStrip();
-    this._renderProgress();
-    if (this._openEntity) this._maybeRerenderDialog();
+    // A throw in here used to leave the card as an empty shell — header and
+    // nothing else — with the reason visible only in a console the device
+    // may not have. Whatever goes wrong now says so on the card itself.
+    try {
+      this._renderRows();
+      this._renderStatusStrip();
+      this._renderProgress();
+      if (this._openEntity) this._maybeRerenderDialog();
+    } catch (err) {
+      this._showFailure(err);
+    }
+  }
+
+  /** Surface a render failure in the card, once. */
+  _showFailure(err) {
+    // hass is pushed on every state change, so without this guard a
+    // persistent failure would stack up hundreds of identical messages.
+    if (this._failed) return;
+    this._failed = true;
+    if (window.console && console.error) {
+      console.error("park-visits-table-card render failed:", err);
+    }
+    const content = this.querySelector(".card-content");
+    if (!content) return;
+    const box = document.createElement("div");
+    box.className = "pv-warn pv-fail";
+    const message = err && err.message ? err.message : String(err);
+    const frame = err && err.stack ? String(err.stack).split("\n")[1] || "" : "";
+    box.textContent = "Park Visits card error: " + message + (frame ? "  " + frame.trim() : "");
+    content.insertBefore(box, content.firstChild);
   }
 
   /* -------------------------------------------------------------- progress */
@@ -646,8 +672,10 @@ class ParkVisitsTableCard extends HTMLElement {
 
   _rows() {
     if (!this._hass) return [];
+    // Guard `attributes`: this runs over every state in the instance, and one
+    // malformed entry would otherwise throw and empty the whole table.
     let rows = Object.values(this._hass.states).filter(
-      (s) => s.attributes.source === this.config.source
+      (s) => s && s.attributes && s.attributes.source === this.config.source
     );
     if (this.config.only_visited) {
       rows = rows.filter((s) => !!s.attributes.our_visit_date);
@@ -690,14 +718,38 @@ class ParkVisitsTableCard extends HTMLElement {
     if (signature === this._signature) return;
     this._signature = signature;
 
-    this.querySelector("tbody").innerHTML = rows
-      .map(
-        (s) =>
-          `<tr>${this._columns
-            .map((c) => `<td class="${c.numeric ? "num" : ""}">${c.display(s)}</td>`)
-            .join("")}</tr>`
-      )
-      .join("");
+    // An empty table used to render as blank space, which is impossible to
+    // tell apart from the card having failed. Say which it is, and give the
+    // numbers needed to work out why nothing matched.
+    if (!rows.length) {
+      const states = Object.values(this._hass.states);
+      const matching = states.filter(
+        (s) => s.attributes && s.attributes.source === this.config.source
+      ).length;
+      let why;
+      if (this._filter) {
+        why = `No parks match "${escapeHtml(this._filter)}".`;
+      } else if (matching && this.config.only_visited) {
+        why = `None of the ${matching} tracked parks have been visited yet.`;
+      } else if (matching) {
+        why = `${matching} parks are tracked but none could be listed.`;
+      } else {
+        why =
+          `No entities with source "${escapeHtml(this.config.source)}" ` +
+          `(searched ${states.length} states). Is the Park Visits integration loaded?`;
+      }
+      this.querySelector("tbody").innerHTML =
+        `<tr><td class="pv-empty" colspan="${this._columns.length}">${why}</td></tr>`;
+    } else {
+      this.querySelector("tbody").innerHTML = rows
+        .map(
+          (s) =>
+            `<tr>${this._columns
+              .map((c) => `<td class="${c.numeric ? "num" : ""}">${c.display(s)}</td>`)
+              .join("")}</tr>`
+        )
+        .join("");
+    }
 
     this.querySelectorAll("th").forEach((th) => {
       const arrow = th.querySelector(".pv-arrow");
@@ -1651,6 +1703,14 @@ const STYLES = `
   .pv-warn {
     margin-top: 10px; padding: 8px 10px; border-radius: 6px; font-size: 13px;
     background: var(--secondary-background-color, #2a2a2a);
+  }
+  .pv-fail {
+    margin: 0 0 10px; color: var(--error-color, #f44336);
+    border: 1px solid var(--error-color, #f44336);
+  }
+  .pv-empty {
+    padding: 16px 8px; text-align: center; font-size: 13px;
+    color: var(--secondary-text-color, #9e9e9e);
   }
   .pv-tagrow {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;
