@@ -48,6 +48,9 @@
 
 <h2>4. Card render test</h2>
 <div id="render">Waiting for the cards to load…</div>
+
+<h2>5. Other dashboard modules</h2>
+<div id="others">Loading…</div>
 <!-- The cards are built for real in here; kept out of sight so the page
      stays readable on a small panel. -->
 <div id="stage" style="position:absolute; left:-10000px; width:900px;"></div>
@@ -240,7 +243,54 @@
     resultBox.appendChild(verdict);
 
     renderTest();
+    otherModulesTest();
   }, 4000);
+
+  /**
+   * The dashboard loads more than the Park Visits cards.
+   *
+   * Home Assistant injects every extra module URL into the page, and one of
+   * them failing on this engine breaks rendering for everything — a card
+   * that works in isolation (sections 1 and 4) can still never appear.
+   * card-mod in particular wraps other cards as they render.
+   */
+  function otherModulesTest() {
+    var box = document.getElementById("others");
+    box.innerHTML = "";
+
+    /* The paths HACS actually serves. Note that this instance ALSO injects
+       /www/community/... copies of the first two, which 404 for every
+       browser — harmless, since the Lovelace resource entries below are what
+       really load them, but worth knowing when reading these results. */
+    var modules = [
+      ["/hacsfiles/lovelace-card-mod/card-mod.js", "card-mod (wraps every card)"],
+      ["/hacsfiles/kiosk-mode/kiosk-mode.js", "kiosk-mode"],
+      ["/hacsfiles/iconset.js", "HACS iconset"],
+      ["/hacsfiles/lovelace-mushroom/mushroom.js", "mushroom (any other custom card)"]
+    ];
+
+    for (var m = 0; m < modules.length; m++) {
+      (function (url, label) {
+        var el = document.createElement("script");
+        el.type = "module";
+        el.src = url + "?probe=" + new Date().getTime();
+        el.onload = function () { show(box, label, true); };
+        el.onerror = function () {
+          show(box, label + "  — failed to load or run", false);
+          errorBox.appendChild(document.createTextNode(
+            "\n" + url + " failed to load on this browser\n"
+          ));
+        };
+        document.head.appendChild(el);
+      })(modules[m][0], modules[m][1]);
+    }
+
+    setTimeout(function () {
+      if (!box.firstChild) {
+        show(box, "no module reported back — none of them loaded", false);
+      }
+    }, 5000);
+  }
 
   /**
    * Registering is not the same as working: a card can define itself and
