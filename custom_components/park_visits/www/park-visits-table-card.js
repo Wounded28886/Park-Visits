@@ -1826,10 +1826,18 @@ const STYLES = `
   .pv-lb-nav button:hover { border-color: var(--primary-color, #03a9f4); }
 </style>`;
 
-customElements.define("park-visits-table-card", ParkVisitsTableCard);
+// Defining a name twice throws, which aborts the rest of this module.
+// A card can legitimately arrive more than once — served from the
+// integration and also registered as a Lovelace resource, say — so let
+// the second arrival quietly stand down instead of erroring.
+if (!customElements.get("park-visits-table-card")) {
+  customElements.define("park-visits-table-card", ParkVisitsTableCard);
+}
 window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "park-visits-table-card",
-  name: "Park Visits Table",
-  description: "Sortable park table with detail panel, Google reviews and our own review form.",
-});
+if (!window.customCards.some((c) => c.type === "park-visits-table-card")) {
+  window.customCards.push({
+    type: "park-visits-table-card",
+    name: "Park Visits Table",
+    description: "Sortable park table with detail panel, Google reviews and our own review form.",
+  });
+}

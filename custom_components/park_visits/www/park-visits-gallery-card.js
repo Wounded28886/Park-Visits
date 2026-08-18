@@ -522,10 +522,18 @@ const STYLES = `
   .pvg-nav button:hover { border-color: var(--primary-color, #03a9f4); }
 </style>`;
 
-customElements.define("park-visits-gallery-card", ParkVisitsGalleryCard);
+// Defining a name twice throws, which aborts the rest of this module.
+// A card can legitimately arrive more than once — served from the
+// integration and also registered as a Lovelace resource, say — so let
+// the second arrival quietly stand down instead of erroring.
+if (!customElements.get("park-visits-gallery-card")) {
+  customElements.define("park-visits-gallery-card", ParkVisitsGalleryCard);
+}
 window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "park-visits-gallery-card",
-  name: "Park Visits Gallery",
-  description: "Collage of photos from our park reviews.",
-});
+if (!window.customCards.some((c) => c.type === "park-visits-gallery-card")) {
+  window.customCards.push({
+    type: "park-visits-gallery-card",
+    name: "Park Visits Gallery",
+    description: "Collage of photos from our park reviews.",
+  });
+}
