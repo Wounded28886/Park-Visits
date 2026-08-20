@@ -83,6 +83,10 @@ def _resource_collection(hass: HomeAssistant) -> Any | None:
     """
     data = hass.data.get("lovelace")
     if data is None:
+        _LOGGER.info(
+            "No lovelace data found; keys resembling it: %s",
+            [str(k) for k in hass.data if "lovelace" in str(k).lower()],
+        )
         return None
 
     # Recent Home Assistant exposes a LovelaceData dataclass here; older
@@ -94,10 +98,17 @@ def _resource_collection(hass: HomeAssistant) -> Any | None:
         resources = getattr(data, "resources", None)
         mode = getattr(data, "mode", None)
 
-    if mode != "storage" or resources is None:
-        return None
-    # The YAML-backed collection has no create/update methods.
-    if not hasattr(resources, "async_create_item"):
+    writable = hasattr(resources, "async_create_item")
+    if mode != "storage" or resources is None or not writable:
+        # Logged at info because the fallback is silent otherwise, and this
+        # is the branch that decides which loading mechanism a device gets.
+        _LOGGER.info(
+            "Lovelace resource collection unusable: data=%s mode=%r resources=%s writable=%s",
+            type(data).__name__,
+            mode,
+            type(resources).__name__,
+            writable,
+        )
         return None
     return resources
 
