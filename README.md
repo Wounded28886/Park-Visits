@@ -284,8 +284,7 @@ custom_components/park_visits/
 ├── strings.json / translations/en.json
 └── www/
     ├── park-visits-table-card.js     # sortable table, park detail panel, review form
-    ├── park-visits-gallery-card.js   # collage of review + Immich-tagged photos
-    └── probe.html                    # browser diagnostic for old embedded displays
+    └── park-visits-gallery-card.js   # collage of review + Immich-tagged photos
 dashboards/
 └── park_visits_dashboard.yaml
 ```
@@ -294,8 +293,18 @@ Bundling the cards inside `custom_components/park_visits/www/` (rather than
 a top-level `www/`) is deliberate: HACS downloads and updates the whole
 `custom_components/park_visits/` tree as one unit, so the cards ship and
 update with the integration automatically. `frontend.py` serves that folder
-at a URL and calls `add_extra_js_url()` so every dashboard picks the cards
-up without a manual Lovelace "Add Resource" step.
+at a URL and registers each card as a **Lovelace resource**, keeping the
+URL's version in step with the manifest — so an update is picked up on the
+next page load, and there's no manual "Add Resource" step.
+
+On a YAML-mode dashboard, where the resource collection can't be written to,
+it falls back to `add_extra_js_url()`. Only ever one of the two: registering
+both downloads and parses the same card twice per page, and since both URLs
+name the same file the browser may collapse them into a single module that
+then fails to evaluate — leaving Home Assistant reporting "Custom element
+doesn't exist" for a card that is perfectly healthy. That is not theoretical:
+it is exactly what happened on a Samsung Family Hub display, which Home
+Assistant serves its legacy ES5 frontend to.
 
 ## Requirements
 
