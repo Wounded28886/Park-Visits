@@ -27,6 +27,7 @@ from typing import Any
 
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.start import async_at_started
 from homeassistant.loader import async_get_integration
 
 from .const import DOMAIN
@@ -58,12 +59,20 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
     # page load instead of needing a manual cache clear.
     version = await _async_card_version(hass)
 
-    if await _async_sync_resources(hass, version):
-        return
+    async def _load_cards(_: HomeAssistant) -> None:
+        if await _async_sync_resources(hass, version):
+            return
+        _LOGGER.debug("Lovelace resources unavailable; falling back to extra_js_url")
+        for filename in CARD_FILES:
+            add_extra_js_url(hass, f"{URL_BASE}/{filename}?v={version}")
 
-    _LOGGER.debug("Lovelace resources unavailable; falling back to extra_js_url")
-    for filename in CARD_FILES:
-        add_extra_js_url(hass, f"{URL_BASE}/{filename}?v={version}")
+    # Deferred until startup finishes: this entry can be set up before the
+    # lovelace component is, and its resource collection doesn't exist until
+    # it is — which silently sent every install down the fallback path. The
+    # choice between the two mechanisms has to wait until we can actually
+    # tell whether the collection is there. (Registering the fallback early
+    # and the resource later would load both, which is the bug being fixed.)
+    async_at_started(hass, _load_cards)
 
 
 def _resource_collection(hass: HomeAssistant) -> Any | None:
