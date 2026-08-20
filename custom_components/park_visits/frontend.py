@@ -93,21 +93,22 @@ def _resource_collection(hass: HomeAssistant) -> Any | None:
     # versions used a plain dict.
     if isinstance(data, dict):
         resources = data.get("resources")
-        mode = data.get("mode")
     else:
         resources = getattr(data, "resources", None)
-        mode = getattr(data, "mode", None)
 
-    writable = hasattr(resources, "async_create_item")
-    if mode != "storage" or resources is None or not writable:
-        # Logged at info because the fallback is silent otherwise, and this
-        # is the branch that decides which loading mechanism a device gets.
+    # Whether the collection can be written to is the test, not the reported
+    # dashboard mode: LovelaceData has carried no `mode` attribute since at
+    # least 2026.8, so checking it skipped this path on every install. Storage
+    # mode gives a ResourceStorageCollection with create/update; YAML mode
+    # gives a ResourceYAMLCollection without them, and must be left alone.
+    if resources is None or not hasattr(resources, "async_create_item"):
+        # Logged at info because the fallback is otherwise silent, and this
+        # branch decides which loading mechanism every device gets.
         _LOGGER.info(
-            "Lovelace resource collection unusable: data=%s mode=%r resources=%s writable=%s",
+            "Lovelace resources not writable here (data=%s, resources=%s); "
+            "cards will be injected per page instead",
             type(data).__name__,
-            mode,
             type(resources).__name__,
-            writable,
         )
         return None
     return resources
