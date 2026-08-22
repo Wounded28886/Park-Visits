@@ -33,6 +33,17 @@ function formatLocalDate(dateStr) {
   return Number.isNaN(d.getTime()) ? dateStr : d.toLocaleDateString();
 }
 
+// Mirrors util.slugify_person on the backend — must stay identical, since
+// this is how a person's name is turned into the key used in a park's
+// person_ratings map.
+function slugifyPerson(name) {
+  return String(name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 class ParkVisitsGalleryCard extends HTMLElement {
   constructor() {
     super();
@@ -101,6 +112,34 @@ class ParkVisitsGalleryCard extends HTMLElement {
           : sum,
       0
     );
+  }
+
+  _sensorByRole(role) {
+    if (!this._hass) return null;
+    return (
+      Object.values(this._hass.states).find(
+        (s) => s.attributes && s.attributes.park_visits_role === role
+      ) || null
+    );
+  }
+
+  /**
+   * The configured people list, read from the park_count-role sensor's
+   * `people` attribute — same lookup the table card uses, so the lightbox
+   * shows one rating line per configured person rather than a fixed set.
+   */
+  _configuredPeople() {
+    const sensor = this._sensorByRole("park_count");
+    const names = (sensor && sensor.attributes.people) || [];
+    const seen = new Set();
+    const people = [];
+    for (const name of names) {
+      const id = slugifyPerson(name);
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      people.push({ id, name });
+    }
+    return people;
   }
 
   _build() {
@@ -381,13 +420,15 @@ class ParkVisitsGalleryCard extends HTMLElement {
 
     const ratingLine = (label, value) =>
       value != null ? `<div><strong>${label}:</strong> ${escapeHtml(value)}/10</div>` : "";
+    const personRatings = park.person_ratings || {};
+    const personRatingLines = this._configuredPeople()
+      .map((p) => ratingLine(p.name, personRatings[p.id]))
+      .join("");
     const review = park.visit_date
       ? `
         <div class="pvg-review">
           ${ratingLine("Overall Rating", park.overall_rating)}
-          ${ratingLine("Kids Rating", park.kids_rating)}
-          ${ratingLine("Mums Rating", park.mums_rating)}
-          ${ratingLine("Dads Rating", park.dads_rating)}
+          ${personRatingLines}
           ${park.liked ? `<div><strong>Liked:</strong> ${escapeHtml(park.liked)}</div>` : ""}
           ${
             park.disliked

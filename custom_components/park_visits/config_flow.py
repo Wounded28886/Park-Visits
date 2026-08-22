@@ -18,10 +18,12 @@ from .const import (
     CONF_LOCATION,
     CONF_LOCATION_NAME,
     CONF_MAX_PARKS,
+    CONF_PEOPLE,
     CONF_RADIUS_KM,
     DEFAULT_IMMICH_MAX_ASSETS,
     DEFAULT_MAX_PARKS,
     DEFAULT_NAME,
+    DEFAULT_PEOPLE,
     DEFAULT_RADIUS_KM,
     DOMAIN,
     MAX_IMMICH_MAX_ASSETS,
@@ -37,6 +39,29 @@ from .geocoding import (
     GeocodeNotFound,
     async_geocode_location,
 )
+from .util import slugify_person
+
+_PEOPLE_TEXT_DEFAULT = ", ".join(DEFAULT_PEOPLE)
+
+
+def _parse_people(raw: str) -> list[str]:
+    """Comma-separated names -> a clean, deduplicated list, in the order typed.
+
+    Dedup is by slug (util.slugify_person), not exact text, so "Mum" and
+    "mum " collapse to one entry the same way they'd collide in storage.
+    """
+    seen_slugs: set[str] = set()
+    people: list[str] = []
+    for part in raw.split(","):
+        name = part.strip()
+        if not name:
+            continue
+        slug = slugify_person(name)
+        if not slug or slug in seen_slugs:
+            continue
+        seen_slugs.add(slug)
+        people.append(name)
+    return people
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,6 +86,12 @@ def _schema(defaults: dict[str, Any], *, require_key: bool) -> vol.Schema:
             vol.Required(CONF_MAX_PARKS, default=defaults[CONF_MAX_PARKS]): vol.All(
                 vol.Coerce(int), vol.Range(min=MIN_MAX_PARKS, max=MAX_MAX_PARKS)
             ),
+            # Comma-separated, parsed in async_step_user/async_step_init — see
+            # the "Deliberately plain voluptuous validators" note above for
+            # why this isn't a multi-value Selector.
+            vol.Optional(
+                CONF_PEOPLE, default=defaults.get(CONF_PEOPLE, _PEOPLE_TEXT_DEFAULT)
+            ): str,
             # Optional: leave blank to keep photos local-upload only.
             vol.Optional(
                 CONF_IMMICH_URL, default=defaults.get(CONF_IMMICH_URL, "")
@@ -133,7 +164,11 @@ class ParkVisitsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if resolved:
                     await self.async_set_unique_id(DOMAIN)
                     self._abort_if_unique_id_configured()
-                    options = {**user_input, **resolved}
+                    options = {
+                        **user_input,
+                        **resolved,
+                        CONF_PEOPLE: _parse_people(user_input[CONF_PEOPLE]),
+                    }
                     title = f"{DEFAULT_NAME} — {resolved[CONF_LOCATION_NAME]}"
                     return self.async_create_entry(title=title, data={}, options=options)
 
@@ -141,6 +176,7 @@ class ParkVisitsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             CONF_LOCATION: (user_input or {}).get(CONF_LOCATION, ""),
             CONF_RADIUS_KM: (user_input or {}).get(CONF_RADIUS_KM, DEFAULT_RADIUS_KM),
             CONF_MAX_PARKS: (user_input or {}).get(CONF_MAX_PARKS, DEFAULT_MAX_PARKS),
+            CONF_PEOPLE: (user_input or {}).get(CONF_PEOPLE, _PEOPLE_TEXT_DEFAULT),
         }
         return self.async_show_form(
             step_id="user", data_schema=_schema(defaults, require_key=True), errors=errors
@@ -180,7 +216,11 @@ class ParkVisitsOptionsFlow(config_entries.OptionsFlow):
                     self.hass, user_input[CONF_API_KEY], user_input[CONF_LOCATION]
                 )
                 if resolved:
-                    options = {**user_input, **resolved}
+                    options = {
+                        **user_input,
+                        **resolved,
+                        CONF_PEOPLE: _parse_people(user_input[CONF_PEOPLE]),
+                    }
                     self.hass.config_entries.async_update_entry(
                         self.config_entry,
                         title=f"{DEFAULT_NAME} — {resolved[CONF_LOCATION_NAME]}",
@@ -192,6 +232,10 @@ class ParkVisitsOptionsFlow(config_entries.OptionsFlow):
             CONF_LOCATION: self.config_entry.options.get(CONF_LOCATION, ""),
             CONF_RADIUS_KM: self.config_entry.options.get(CONF_RADIUS_KM, DEFAULT_RADIUS_KM),
             CONF_MAX_PARKS: self.config_entry.options.get(CONF_MAX_PARKS, DEFAULT_MAX_PARKS),
+            CONF_PEOPLE: (user_input or {}).get(
+                CONF_PEOPLE,
+                ", ".join(self.config_entry.options.get(CONF_PEOPLE, DEFAULT_PEOPLE)),
+            ),
             CONF_IMMICH_URL: self.config_entry.options.get(CONF_IMMICH_URL, ""),
             CONF_IMMICH_API_KEY: self.config_entry.options.get(CONF_IMMICH_API_KEY, ""),
             CONF_IMMICH_MAX_ASSETS: self.config_entry.options.get(

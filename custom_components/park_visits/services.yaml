@@ -17,36 +17,17 @@ rate_park:
       required: true
       selector:
         date:
-    kids_rating:
-      name: Kids Rating
-      description: The kids' rating out of 10. This is the only rating that's required.
-      required: true
-      selector:
-        number:
-          min: 0
-          max: 10
-          step: 0.5
-          mode: slider
-    mums_rating:
-      name: Mums Rating
-      description: Mum's rating out of 10.
+    person_ratings:
+      name: Person ratings
+      description: >-
+        Map of person id to rating out of 10, one entry per configured person
+        who was actually rated (e.g. {kids: 8, mum: 7.5}). A person's id is
+        their name lowercased with non-letters/digits turned into
+        underscores (see the Park Visits options for the configured names).
+        Nobody is required — a review only requires a visit date.
       required: false
       selector:
-        number:
-          min: 0
-          max: 10
-          step: 0.5
-          mode: slider
-    dads_rating:
-      name: Dads Rating
-      description: Dad's rating out of 10.
-      required: false
-      selector:
-        number:
-          min: 0
-          max: 10
-          step: 0.5
-          mode: slider
+        object:
     playground_rating:
       name: Playground
       description: Playground rating out of 10.

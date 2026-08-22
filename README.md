@@ -7,7 +7,8 @@ the **Google Places API**, ranked by Google rating.
 
 The dashboard is a sortable table: click a column to sort by it, click a park
 to open its detail panel with Google's photos and reviews, and write your own
-review — a visit date, per-person and per-aspect ratings, what you liked,
+review — a visit date, a rating out of 10 for each person you've configured
+plus a set of per-aspect ratings, what you liked,
 what you didn't, notes and photos. A second **Visited** view tracks progress
 against the whole tracked list with a "23 / 100 visited" bar and a table of
 every visited park.
@@ -40,9 +41,9 @@ every visited park.
     automations — "remind us about the next park on Saturday morning", say.
   - A **"Refresh parks" button** — see [Refresh cost](#refresh-cost-and-cadence).
 - Registers services to record and remove reviews — **`rate_park`** (visit
-  date, Kids Rating required, Mums/Dads/Playground/Scenery/Wildlife/
-  Facilities/Parking ratings optional, liked, disliked, notes — see
-  [Family ratings](#family-ratings)), **`delete_review`** (also deletes that
+  date required, a rating per configured person plus Playground/Scenery/
+  Wildlife/Facilities/Parking all optional, liked, disliked, notes — see
+  [Person ratings](#person-ratings)), **`delete_review`** (also deletes that
   review's photo files) and **`delete_photo`** (one photo) — plus
   **`set_next_park`** / **`clear_next_park`** for planning the next visit. Reviews are stored locally
   (`.storage`, keyed by Google's place_id) and survive dataset refreshes —
@@ -58,8 +59,9 @@ every visited park.
     review opens its **own popup** in place of that panel, where you can set
     the visit date, every rating, what you liked and didn't, add notes,
     attach photos, delete individual photos, or delete the whole review. The
-    card's `columns` config controls which columns show (see
-    [Family ratings](#family-ratings)), and `only_visited` / `show_progress`
+    card's `columns` config controls which columns show — including a
+    `people` entry that expands into one column per configured person (see
+    [Person ratings](#person-ratings)) — and `only_visited` / `show_progress`
     power the Visited view. Set `show_upload: false` to hide the "Add photos"
     field when a park's pictures come from Immich instead.
   - `park-visits-gallery-card` — a collage of every photo attached to a
@@ -136,36 +138,49 @@ With Immich supplying the pictures you can turn the upload field off entirely
 — set `show_upload: false` on the table card. Existing uploaded photos still
 display and can still be deleted; only the "Add photos" input goes away.
 
-## Family ratings
+## Person ratings
+
+**Who rates a park** is configurable, at setup and later via **Configure**
+— type a comma-separated list of names (default "Kids, Mum, Dad"). Each
+name becomes its own optional 0–10 rating field on the review form, so the
+form always matches your household, not a fixed set of roles.
 
 A review is a **visit date** (defaults to today, but can be back-dated —
 this is what drives "last visited" and the Visited view's sort, not when you
-happened to type the review in) plus up to eight ratings out of 10:
+happened to type the review in) plus:
 
-- **Kids Rating** — the only rating that's required.
-- **Mums Rating**, **Dads Rating** — optional.
+- One optional rating out of 10 **per configured person**. Nobody is
+  required — a review only needs a visit date.
 - **Playground**, **Scenery**, **Wildlife**, **Facilities**, **Parking** —
   optional per-aspect scores.
 
-**Overall Rating** isn't entered — it's the average of whichever of Kids,
-Mums and Dads ratings were filled in, computed fresh every time
+**Overall Rating** isn't entered — it's the average of whichever configured
+people were actually rated on a given review, computed fresh every time
 (`Review.overall_rating` in `storage.py`) so it can never drift out of sync
 with the ratings it's built from. It's what shows in the main Parks table
 and what `sensor.last_visited_park` reports.
 
+A person's identity is their name, lowercased with anything that isn't a
+letter or digit turned into an underscore (`slugify_person` in `util.py`) —
+so renaming "Mum" to "Mom" is treated as a brand new person, and existing
+ratings stay filed under the old name until you edit those reviews. Renaming
+back later reunites them with their old rating history.
+
 The table card only shows the columns you list in its `columns` config
 (anything omitted just isn't rendered — the underlying data is still there).
-The default Parks view keeps things compact: rank, name, Google rating,
-categories, distance, Overall Rating. The Visited view opts into every
-rating column plus the visit date — see `dashboards/park_visits_dashboard.yaml`
-for the exact list, or write your own.
+A `people` entry in that list expands into one column per configured
+person, in configured order. The default Parks view keeps things compact:
+rank, name, Google rating, categories, distance, Overall Rating. The Visited
+view opts into every person and per-aspect rating column plus the visit
+date — see `dashboards/park_visits_dashboard.yaml` for the exact list, or
+write your own.
 
-**If you're upgrading from a version before this**, your existing single
-0–10 rating becomes the **Kids Rating** on every existing review, and the
-date portion of its old timestamp becomes its **visit date** — nothing is
-lost, but Mums/Dads/Playground/Scenery/Wildlife/Facilities/Parking start
-blank on those older reviews until you edit them. This happens automatically
-the first time each review is loaded; there's no manual migration step.
+**If you're upgrading from a version before this**, your existing
+Kids/Mums/Dads ratings migrate automatically into a default people list of
+"Kids", "Mum" and "Dad" — nothing is lost, and there's no manual migration
+step. If you'd rather use different names, just change the **people** field
+via **Configure**; existing ratings stay under the old names until you edit
+those reviews.
 
 ## Installation
 
@@ -198,12 +213,16 @@ the first time each review is loaded; there's no manual migration step.
    number of parks to show (default top 100). The location is resolved to
    coordinates automatically; if it can't be found, the form shows an error
    so you can try a more specific location.
-3. Optionally fill in the **Immich URL** and **Immich API key** to pull park
+3. Type in **who rates a park**, as a comma-separated list of names (default
+   "Kids, Mum, Dad") — see [Person ratings](#person-ratings) for how this
+   drives the review form.
+4. Optionally fill in the **Immich URL** and **Immich API key** to pull park
    photos from your own library, and **Max Immich photos per park** to cap how
    many each park shows — see [Photos from Immich](#photos-from-immich).
    Leave the URL and key blank to skip it entirely.
-4. You can change any of this later via the integration's **Configure**
-   button — this triggers a reload and regenerates the tracked parks.
+5. You can change any of this later via the integration's **Configure**
+   button, including adding, renaming or removing people — this triggers a
+   reload and regenerates the tracked parks.
 
 ### 4. Add the dashboard
 

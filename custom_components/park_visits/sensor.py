@@ -19,10 +19,13 @@ from .const import (
     ATTRIBUTION,
     CONF_LOCATION_NAME,
     CONF_MAX_PARKS,
+    CONF_PEOPLE,
     CONF_RADIUS_KM,
+    DEFAULT_PEOPLE,
     DOMAIN,
     ROLE_LAST_VISITED,
     ROLE_NEXT_PARK,
+    ROLE_PARK_COUNT,
 )
 from .coordinator import ParkVisitsCoordinator
 
@@ -71,11 +74,15 @@ class ParkCountSensor(CoordinatorEntity[ParkVisitsCoordinator], SensorEntity):
     def extra_state_attributes(self) -> dict[str, object]:
         options = self._entry.options
         return {
+            # Cards read the configured people list from here (by role, not
+            # entity_id) to build one rating column/field per person.
+            ATTR_ROLE: ROLE_PARK_COUNT,
             CONF_LOCATION_NAME: options.get(CONF_LOCATION_NAME),
             CONF_LATITUDE: options.get(CONF_LATITUDE),
             CONF_LONGITUDE: options.get(CONF_LONGITUDE),
             CONF_RADIUS_KM: options.get(CONF_RADIUS_KM),
             CONF_MAX_PARKS: options.get(CONF_MAX_PARKS),
+            CONF_PEOPLE: options.get(CONF_PEOPLE, DEFAULT_PEOPLE),
         }
 
 
@@ -135,9 +142,7 @@ class LastVisitedParkSensor(CoordinatorEntity[ParkVisitsCoordinator], SensorEnti
             ATTR_ROLE: ROLE_LAST_VISITED,
             "place_id": visited.get("place_id"),
             "our_overall_rating": visited.get("our_overall_rating"),
-            "our_kids_rating": visited.get("our_kids_rating"),
-            "our_mums_rating": visited.get("our_mums_rating"),
-            "our_dads_rating": visited.get("our_dads_rating"),
+            "our_person_ratings": visited.get("our_person_ratings", {}),
             "our_liked": visited.get("our_liked", ""),
             "our_disliked": visited.get("our_disliked", ""),
             "our_note": visited.get("our_note", ""),
@@ -152,7 +157,7 @@ class LastVisitedParkSensor(CoordinatorEntity[ParkVisitsCoordinator], SensorEnti
 class VisitedCountSensor(CoordinatorEntity[ParkVisitsCoordinator], SensorEntity):
     """How many of the currently tracked parks we've actually visited.
 
-    "Visited" means a review with a kids_rating was submitted (a stub
+    "Visited" means a review with a visit date was submitted (a stub
     review created purely by an early photo upload doesn't count — same
     rule the table card uses to decide "Review" vs "Edit").
     """

@@ -71,9 +71,7 @@ views:
               - name
               - our_visit_date
               - our_overall_rating
-              - our_kids_rating
-              - our_mums_rating
-              - our_dads_rating
+              - people
               - our_playground_rating
               - our_scenery_rating
               - our_wildlife_rating

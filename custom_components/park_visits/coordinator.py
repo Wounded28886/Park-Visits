@@ -64,9 +64,7 @@ class RankedPark:
     rating_count: int
     google_maps_uri: str | None
     distance_km: float
-    our_kids_rating: float | None
-    our_mums_rating: float | None
-    our_dads_rating: float | None
+    our_person_ratings: dict[str, float]
     our_playground_rating: float | None
     our_scenery_rating: float | None
     our_wildlife_rating: float | None
@@ -262,9 +260,7 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
                     "rating_count": place.get("userRatingCount", 0),
                     "google_maps_uri": place.get("googleMapsUri"),
                     "distance_km": haversine_km(center_lat, center_lon, lat, lon),
-                    "our_kids_rating": review.kids_rating if review else None,
-                    "our_mums_rating": review.mums_rating if review else None,
-                    "our_dads_rating": review.dads_rating if review else None,
+                    "our_person_ratings": dict(review.person_ratings) if review else {},
                     "our_playground_rating": review.playground_rating if review else None,
                     "our_scenery_rating": review.scenery_rating if review else None,
                     "our_wildlife_rating": review.wildlife_rating if review else None,
@@ -363,9 +359,7 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
             "place_id": latest_id,
             "park_name": (park.name if park else "") or latest.park_name or "Unknown park",
             "our_overall_rating": latest.overall_rating,
-            "our_kids_rating": latest.kids_rating,
-            "our_mums_rating": latest.mums_rating,
-            "our_dads_rating": latest.dads_rating,
+            "our_person_ratings": dict(latest.person_ratings),
             "our_liked": latest.liked,
             "our_disliked": latest.disliked,
             "our_note": latest.note,
@@ -387,10 +381,8 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
     async def async_submit_review(
         self,
         place_id: str,
-        kids_rating: float,
+        person_ratings: dict[str, float],
         visit_date: str,
-        mums_rating: float | None = None,
-        dads_rating: float | None = None,
         playground_rating: float | None = None,
         scenery_rating: float | None = None,
         wildlife_rating: float | None = None,
@@ -403,10 +395,8 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         """Record a review locally and refresh entities without hitting the API."""
         await self.reviews.async_set_review(
             place_id,
-            kids_rating,
+            person_ratings,
             visit_date,
-            mums_rating=mums_rating,
-            dads_rating=dads_rating,
             playground_rating=playground_rating,
             scenery_rating=scenery_rating,
             wildlife_rating=wildlife_rating,
@@ -447,9 +437,7 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         reviews = self.reviews.all_reviews()
         for park in self.data:
             review = reviews.get(park.place_id)
-            park.our_kids_rating = review.kids_rating if review else None
-            park.our_mums_rating = review.mums_rating if review else None
-            park.our_dads_rating = review.dads_rating if review else None
+            park.our_person_ratings = dict(review.person_ratings) if review else {}
             park.our_playground_rating = review.playground_rating if review else None
             park.our_scenery_rating = review.scenery_rating if review else None
             park.our_wildlife_rating = review.wildlife_rating if review else None

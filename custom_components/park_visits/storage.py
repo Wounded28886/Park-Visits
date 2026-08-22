@@ -35,17 +35,17 @@ class Review:
     tracked list (rating shifts, radius changes) while its review and photos
     live on, and the gallery still needs something to label them with.
 
-    Ratings are per family member/aspect rather than one blended number:
-    ``kids_rating`` is the only one that's required (it's the closest thing
-    to a headline rating), everything else is optional. ``overall_rating``
-    is deliberately not a stored field — it's the average of
-    kids/mums/dads, computed fresh so it can never drift out of sync with
-    the values it's derived from.
+    ``person_ratings`` holds one optional 0-10 rating per configured person
+    (see const.CONF_PEOPLE), keyed by util.slugify_person(name) rather than
+    the raw name — that way editing someone's name in the options doesn't
+    orphan their history, only replacing/removing it does. Only people who
+    were actually rated appear here; there is no fixed "required" person.
+    ``overall_rating`` is deliberately not a stored field — it's the
+    average of whichever person_ratings are present, computed fresh so it
+    can never drift out of sync with the values it's derived from.
     """
 
-    kids_rating: float | None = None
-    mums_rating: float | None = None
-    dads_rating: float | None = None
+    person_ratings: dict[str, float] = field(default_factory=dict)
     playground_rating: float | None = None
     scenery_rating: float | None = None
     wildlife_rating: float | None = None
@@ -58,14 +58,15 @@ class Review:
     # ISO date "YYYY-MM-DD" the visit actually happened, chosen by whoever
     # wrote the review (defaults to today client-side, but can be back-dated).
     # Empty string means "not reviewed yet" (e.g. a stub created by an
-    # early photo upload before the rating form was submitted).
+    # early photo upload before the rating form was submitted). This is the
+    # only thing a review actually requires.
     visit_date: str = ""
     park_name: str = ""
 
     @property
     def overall_rating(self) -> float | None:
-        """Family average of kids/mums/dads ratings, or None if none are set."""
-        values = [v for v in (self.kids_rating, self.mums_rating, self.dads_rating) if v is not None]
+        """Average of whichever people were rated this visit, or None if none were."""
+        values = list(self.person_ratings.values())
         if not values:
             return None
         return round(sum(values) / len(values), 2)
@@ -74,26 +75,42 @@ class Review:
     def from_dict(cls, data: dict[str, Any]) -> Review:
         """Build from stored JSON, tolerating records written by older versions.
 
-        Pre-1.2 reviews had a single ``rating`` (0-10) and a full ISO
-        ``reviewed_at`` timestamp instead of per-person ratings and a plain
-        visit date. ``rating`` becomes the seed for ``kids_rating`` (the
-        closest existing signal to a family rating) and the date portion of
-        ``reviewed_at`` seeds ``visit_date`` — everything else
-        (mums/dads/playground/scenery/wildlife/facilities/parking) starts
-        blank until edited.
+        Three schema generations to bridge:
+        - Current: ``person_ratings`` is a {person_id: rating} dict.
+        - 1.2-1.6: fixed ``kids_rating``/``mums_rating``/``dads_rating``
+          fields (configurable people replaced these) — migrated onto the
+          default people list's ids ("kids"/"mum"/"dad", which is exactly
+          what slugify_person(name) gives for the default ["Kids", "Mum",
+          "Dad"], so this lines up with an unconfigured install automatically).
+        - Pre-1.2: a single ``rating`` (0-10) and a full ISO ``reviewed_at``
+          timestamp — ``rating`` seeds person_ratings["kids"], and the date
+          portion of ``reviewed_at`` seeds ``visit_date``.
+        Aspect ratings and everything else are unaffected by this and just
+        default to blank on older records.
         """
-        if "kids_rating" in data or "visit_date" in data:
-            kids_rating = data.get("kids_rating")
+        if "person_ratings" in data:
+            raw_ratings = data.get("person_ratings") or {}
+            person_ratings = {k: v for k, v in raw_ratings.items() if v is not None}
+            visit_date = data.get("visit_date", "")
+        elif "kids_rating" in data or "visit_date" in data:
+            person_ratings = {}
+            for person_id, legacy_key in (
+                ("kids", "kids_rating"),
+                ("mum", "mums_rating"),
+                ("dad", "dads_rating"),
+            ):
+                value = data.get(legacy_key)
+                if value is not None:
+                    person_ratings[person_id] = value
             visit_date = data.get("visit_date", "")
         else:
-            kids_rating = data.get("rating")
+            legacy_rating = data.get("rating")
+            person_ratings = {"kids": legacy_rating} if legacy_rating is not None else {}
             legacy_reviewed_at = data.get("reviewed_at") or ""
             visit_date = legacy_reviewed_at[:10] if legacy_reviewed_at else ""
 
         return cls(
-            kids_rating=kids_rating,
-            mums_rating=data.get("mums_rating"),
-            dads_rating=data.get("dads_rating"),
+            person_ratings=person_ratings,
             playground_rating=data.get("playground_rating"),
             scenery_rating=data.get("scenery_rating"),
             wildlife_rating=data.get("wildlife_rating"),
@@ -136,10 +153,8 @@ class ParkReviewStore:
     async def async_set_review(
         self,
         place_id: str,
-        kids_rating: float,
+        person_ratings: dict[str, float],
         visit_date: str,
-        mums_rating: float | None = None,
-        dads_rating: float | None = None,
         playground_rating: float | None = None,
         scenery_rating: float | None = None,
         wildlife_rating: float | None = None,
@@ -159,9 +174,7 @@ class ParkReviewStore:
         """
         existing = self._reviews.get(place_id)
         review = Review(
-            kids_rating=kids_rating,
-            mums_rating=mums_rating,
-            dads_rating=dads_rating,
+            person_ratings=dict(person_ratings or {}),
             playground_rating=playground_rating,
             scenery_rating=scenery_rating,
             wildlife_rating=wildlife_rating,

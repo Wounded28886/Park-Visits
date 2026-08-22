@@ -22,15 +22,13 @@ from .const import (
     DOMAIN,
     MAX_OUR_RATING,
     MIN_OUR_RATING,
-    SERVICE_ATTR_DADS_RATING,
     SERVICE_ATTR_DISLIKED,
     SERVICE_ATTR_FACILITIES_RATING,
     SERVICE_ATTR_FILENAME,
-    SERVICE_ATTR_KIDS_RATING,
     SERVICE_ATTR_LIKED,
-    SERVICE_ATTR_MUMS_RATING,
     SERVICE_ATTR_NOTE,
     SERVICE_ATTR_PARKING_RATING,
+    SERVICE_ATTR_PERSON_RATINGS,
     SERVICE_ATTR_PLACE_ID,
     SERVICE_ATTR_PLAYGROUND_RATING,
     SERVICE_ATTR_SCENERY_RATING,
@@ -58,13 +56,15 @@ _RATING = vol.All(vol.Coerce(float), vol.Range(min=MIN_OUR_RATING, max=MAX_OUR_R
 RATE_PARK_SCHEMA = vol.Schema(
     {
         vol.Required(SERVICE_ATTR_PLACE_ID): cv.string,
-        vol.Required(SERVICE_ATTR_KIDS_RATING): _RATING,
         # ISO date, not a full timestamp — this is "the day we went", chosen
         # by whoever writes the review (defaults to today client-side, but
-        # can be back-dated).
+        # can be back-dated). The only thing a review actually requires.
         vol.Required(SERVICE_ATTR_VISIT_DATE): vol.All(cv.string, vol.Match(r"^\d{4}-\d{2}-\d{2}$")),
-        vol.Optional(SERVICE_ATTR_MUMS_RATING): _RATING,
-        vol.Optional(SERVICE_ATTR_DADS_RATING): _RATING,
+        # {person_id: rating}, one entry per configured person who was
+        # actually rated this visit — see const.CONF_PEOPLE. Nobody is
+        # required, and an id not in the currently configured people list
+        # (e.g. someone since removed) is simply ignored downstream.
+        vol.Optional(SERVICE_ATTR_PERSON_RATINGS, default=dict): vol.Schema({cv.string: _RATING}),
         vol.Optional(SERVICE_ATTR_PLAYGROUND_RATING): _RATING,
         vol.Optional(SERVICE_ATTR_SCENERY_RATING): _RATING,
         vol.Optional(SERVICE_ATTR_WILDLIFE_RATING): _RATING,
@@ -147,10 +147,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
         await coordinator.async_submit_review(
             place_id,
-            call.data[SERVICE_ATTR_KIDS_RATING],
+            call.data.get(SERVICE_ATTR_PERSON_RATINGS) or {},
             call.data[SERVICE_ATTR_VISIT_DATE],
-            mums_rating=call.data.get(SERVICE_ATTR_MUMS_RATING),
-            dads_rating=call.data.get(SERVICE_ATTR_DADS_RATING),
             playground_rating=call.data.get(SERVICE_ATTR_PLAYGROUND_RATING),
             scenery_rating=call.data.get(SERVICE_ATTR_SCENERY_RATING),
             wildlife_rating=call.data.get(SERVICE_ATTR_WILDLIFE_RATING),

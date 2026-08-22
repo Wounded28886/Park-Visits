@@ -1,9 +1,24 @@
-"""Geo helpers for the Park Visits integration."""
+"""Geo and misc helpers for the Park Visits integration."""
 from __future__ import annotations
 
+import re
 from math import asin, atan2, cos, degrees, radians, sin, sqrt
 
 EARTH_RADIUS_KM = 6371.0088
+
+_SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+def slugify_person(name: str) -> str:
+    """Stable id for a configured person, derived purely from their name.
+
+    Deliberately not stored separately from the name anywhere — a rename is
+    indistinguishable from removing the old name and adding a new one (the
+    config UI is just a list of names), so this is naturally re-derived
+    every time. That also means re-adding a name later reunites it with any
+    rating history still sitting under that slug.
+    """
+    return _SLUG_RE.sub("_", name.strip().lower()).strip("_")
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

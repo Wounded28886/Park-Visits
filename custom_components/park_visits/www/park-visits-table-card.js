@@ -5,8 +5,14 @@
  * integration. Click a column header to sort by it; click again to reverse.
  * Click a park's name to open its detail panel: Google's rating, photos and
  * reviews, plus our own review and a form to write or update it (a visit
- * date, ratings for kids/mums/dads plus playground/scenery/wildlife/
+ * date, one rating per configured person plus playground/scenery/wildlife/
  * facilities/parking, what we liked, what we didn't, notes and photos).
+ *
+ * "Who rates a park" is configured once in the integration's setup/options
+ * (a plain comma-separated list of names, e.g. "Kids, Mum, Dad" or "Alice,
+ * Bob, Grandma") — this card reads that list at runtime from the
+ * park_count-role sensor (see _configuredPeople()) rather than having any
+ * fixed set of people baked in.
  *
  * Install: copy this file to config/www/park-visits-table-card.js, then add
  * it as a dashboard resource (Settings > Dashboards > Resources):
@@ -29,9 +35,7 @@
  *     - categories
  *     - distance
  *     - our_overall_rating
- *     - our_kids_rating
- *     - our_mums_rating
- *     - our_dads_rating
+ *     - people                # expands to one column per configured person
  *     - our_playground_rating
  *     - our_scenery_rating
  *     - our_wildlife_rating
@@ -76,6 +80,32 @@ function ratingColumn(key, label) {
     numeric: true,
     value: (s) => s.attributes[key],
     display: (s) => (s.attributes[key] != null ? `${s.attributes[key]}/10` : "—"),
+  };
+}
+
+// Mirrors util.slugify_person() in the backend — must stay in lockstep so a
+// name typed into the integration's options resolves to the same id the
+// backend stores ratings under.
+function slugifyPerson(name) {
+  return String(name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+// A column for one configured person's rating, pulled from the
+// our_person_ratings map on each park entity.
+function personColumn(id, name) {
+  return {
+    key: `person_${id}`,
+    label: name,
+    numeric: true,
+    value: (s) => (s.attributes.our_person_ratings || {})[id],
+    display: (s) => {
+      const v = (s.attributes.our_person_ratings || {})[id];
+      return v != null ? `${v}/10` : "—";
+    },
   };
 }
 
@@ -151,9 +181,6 @@ const ALL_COLUMNS = [
       return bits.join(" ") || "—";
     },
   },
-  ratingColumn("our_kids_rating", "Kids Rating"),
-  ratingColumn("our_mums_rating", "Mums Rating"),
-  ratingColumn("our_dads_rating", "Dads Rating"),
   ratingColumn("our_playground_rating", "Playground"),
   ratingColumn("our_scenery_rating", "Scenery"),
   ratingColumn("our_wildlife_rating", "Wildlife"),
@@ -202,6 +229,12 @@ class ParkVisitsTableCard extends HTMLElement {
     // _photoItems is rebuilt on every render, so this can't live on the
     // items themselves — and it doubles as a cache when paging back.
     this._fullUrls = {};
+    // Resolved once hass (and with it the configured people list) is
+    // available — see _resolveColumns(). Empty/unresolved until then, which
+    // only matters for the first paint frame in practice.
+    this._people = [];
+    this._peopleSignature = "";
+    this._columns = [];
   }
 
   setConfig(config) {
@@ -219,18 +252,75 @@ class ParkVisitsTableCard extends HTMLElement {
       show_upload: true,
       ...config,
     };
-    const keys =
+    this._columnKeys =
       Array.isArray(this.config.columns) && this.config.columns.length
         ? this.config.columns
         : DEFAULT_COLUMN_KEYS;
-    this._columns = keys.map((k) => ALL_COLUMNS.find((c) => c.key === k)).filter(Boolean);
-    if (ALL_COLUMNS.some((c) => c.key === this.config.default_sort)) {
+    this._columns = this._resolveColumns(this._people);
+    if (
+      this._columnKeys.includes(this.config.default_sort) ||
+      ALL_COLUMNS.some((c) => c.key === this.config.default_sort)
+    ) {
       this._sortKey = this.config.default_sort;
     }
     this._sortDir = this.config.default_direction === "desc" ? "desc" : "asc";
     this._built = false;
     this._signature = null;
     if (this.isConnected) this._build();
+  }
+
+  /* ------------------------------------------------------------- columns */
+
+  /**
+   * The configured people list, read from the park_count-role sensor's
+   * `people` attribute rather than hardcoded — see const.CONF_PEOPLE and
+   * sensor.ParkCountSensor on the backend. Deduplicated by slug the same
+   * way the backend dedupes when the option is saved, so a stale/unsaved
+   * duplicate can't produce two columns for one person.
+   */
+  _configuredPeople() {
+    const sensor = this._sensorByRole("park_count");
+    const names = (sensor && sensor.attributes.people) || [];
+    const seen = new Set();
+    const people = [];
+    for (const name of names) {
+      const id = slugifyPerson(name);
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      people.push({ id, name });
+    }
+    return people;
+  }
+
+  /** Expands the configured `columns` keys into column defs, splicing in one column per person wherever "people" appears. */
+  _resolveColumns(people) {
+    return (this._columnKeys || DEFAULT_COLUMN_KEYS).flatMap((key) => {
+      if (key === "people") {
+        return people.map((p) => personColumn(p.id, p.name));
+      }
+      const col = ALL_COLUMNS.find((c) => c.key === key);
+      return col ? [col] : [];
+    });
+  }
+
+  /** Rebuilds just the header row — used at first build and whenever the resolved people list changes. */
+  _renderHeader() {
+    const row = this.querySelector("thead tr");
+    if (!row) return;
+    row.innerHTML = this._columns
+      .map((c) =>
+        c.sortable === false
+          ? `<th class="pv-nosort"></th>`
+          : `<th data-key="${c.key}" title="Sort by ${escapeHtml(
+              c.label
+            )}"><span class="pv-th">${escapeHtml(
+              c.label
+            )}<span class="pv-arrow"></span></span></th>`
+      )
+      .join("");
+    row.querySelectorAll("th[data-key]").forEach((th) => {
+      th.addEventListener("click", () => this._onHeaderClick(th.dataset.key));
+    });
   }
 
   connectedCallback() {
@@ -254,6 +344,15 @@ class ParkVisitsTableCard extends HTMLElement {
     // nothing else — with the reason visible only in a console the device
     // may not have. Whatever goes wrong now says so on the card itself.
     try {
+      const people = this._configuredPeople();
+      const peopleSignature = people.map((p) => p.id).join(",");
+      if (peopleSignature !== this._peopleSignature) {
+        this._peopleSignature = peopleSignature;
+        this._people = people;
+        this._columns = this._resolveColumns(people);
+        this._renderHeader();
+        this._signature = null; // column set changed — force a row rebuild too
+      }
       this._renderRows();
       this._renderStatusStrip();
       this._renderProgress();
@@ -506,9 +605,7 @@ class ParkVisitsTableCard extends HTMLElement {
     return [
       state.last_updated,
       a.friendly_name,
-      a.our_kids_rating,
-      a.our_mums_rating,
-      a.our_dads_rating,
+      JSON.stringify(a.our_person_ratings || {}),
       a.our_playground_rating,
       a.our_scenery_rating,
       a.our_wildlife_rating,
@@ -547,9 +644,12 @@ class ParkVisitsTableCard extends HTMLElement {
     const pending = this._pendingReview;
     if (!pending || pending.placeId !== a.place_id) return a;
 
+    // visit_date is the one field every submission always sets, so it's the
+    // most reliable "has the real state caught up yet" anchor now that no
+    // single rating is privileged/required.
     const caughtUp = pending.cleared
       ? a.our_visit_date == null
-      : a.our_visit_date != null && Number(a.our_kids_rating) === Number(pending.kidsRating);
+      : a.our_visit_date === pending.visitDate;
     if (caughtUp) {
       this._pendingReview = null;
       return a;
@@ -558,9 +658,7 @@ class ParkVisitsTableCard extends HTMLElement {
     return pending.cleared
       ? {
           ...a,
-          our_kids_rating: null,
-          our_mums_rating: null,
-          our_dads_rating: null,
+          our_person_ratings: {},
           our_playground_rating: null,
           our_scenery_rating: null,
           our_wildlife_rating: null,
@@ -607,15 +705,7 @@ class ParkVisitsTableCard extends HTMLElement {
           }
           <div class="pv-scroll">
             <table class="pv-table">
-              <thead><tr>${this._columns.map((c) =>
-                c.sortable === false
-                  ? `<th class="pv-nosort"></th>`
-                  : `<th data-key="${c.key}" title="Sort by ${escapeHtml(
-                      c.label
-                    )}"><span class="pv-th">${escapeHtml(
-                      c.label
-                    )}<span class="pv-arrow"></span></span></th>`
-              ).join("")}</tr></thead>
+              <thead><tr></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -626,9 +716,7 @@ class ParkVisitsTableCard extends HTMLElement {
       ${STYLES}
     `;
 
-    this.querySelectorAll("th[data-key]").forEach((th) => {
-      th.addEventListener("click", () => this._onHeaderClick(th.dataset.key));
-    });
+    this._renderHeader();
     const filterEl = this.querySelector(".pv-filter");
     if (filterEl) {
       filterEl.addEventListener("input", (e) => {
@@ -688,7 +776,14 @@ class ParkVisitsTableCard extends HTMLElement {
         return hay.includes(this._filter);
       });
     }
-    const col = ALL_COLUMNS.find((c) => c.key === this._sortKey) || ALL_COLUMNS[0];
+    // Person columns only exist in the resolved this._columns, not the
+    // static ALL_COLUMNS — search there first, falling back to ALL_COLUMNS
+    // for a default_sort key that isn't in the currently visible columns.
+    const col =
+      this._columns.find((c) => c.key === this._sortKey) ||
+      ALL_COLUMNS.find((c) => c.key === this._sortKey) ||
+      this._columns[0] ||
+      ALL_COLUMNS[0];
     const dir = this._sortDir === "desc" ? -1 : 1;
     return rows.sort((a, b) => {
       const va = col.value(a);
@@ -761,7 +856,9 @@ class ParkVisitsTableCard extends HTMLElement {
 
     const countEl = this.querySelector(".pv-count");
     if (countEl) {
-      const col = ALL_COLUMNS.find((c) => c.key === this._sortKey);
+      const col =
+        this._columns.find((c) => c.key === this._sortKey) ||
+        ALL_COLUMNS.find((c) => c.key === this._sortKey);
       countEl.textContent = `${rows.length} park${rows.length === 1 ? "" : "s"} — sorted by ${
         col ? col.label : this._sortKey
       } (${this._sortDir === "asc" ? "ascending" : "descending"})`;
@@ -1017,13 +1114,15 @@ class ParkVisitsTableCard extends HTMLElement {
     const hasOurReview = a.our_visit_date != null;
     const ratingLine = (label, value) =>
       value != null ? `<div><strong>${label}:</strong> ${escapeHtml(value)}/10</div>` : "";
+    const personRatings = a.our_person_ratings || {};
+    const personRatingLines = this._people
+      .map((p) => ratingLine(p.name, personRatings[p.id]))
+      .join("");
     const ourReview = hasOurReview
       ? `
         <div class="pv-ourreview">
           ${ratingLine("Overall Rating", a.our_overall_rating)}
-          ${ratingLine("Kids Rating", a.our_kids_rating)}
-          ${ratingLine("Mums Rating", a.our_mums_rating)}
-          ${ratingLine("Dads Rating", a.our_dads_rating)}
+          ${personRatingLines}
           ${ratingLine("Playground", a.our_playground_rating)}
           ${ratingLine("Scenery", a.our_scenery_rating)}
           ${ratingLine("Wildlife", a.our_wildlife_rating)}
@@ -1318,11 +1417,22 @@ class ParkVisitsTableCard extends HTMLElement {
       )
       .join("");
 
-    const ratingField = (name, label, value, required) => `
+    // Nothing is required here any more — visit date (below) is the only
+    // thing that makes a review count as a visit at all, so every rating,
+    // person or aspect, is opt-in per review.
+    const ratingField = (name, label, value) => `
       <div class="pv-rating-field">
-        <label>${label}${required ? " *" : ""}</label>
+        <label>${label}</label>
         <input type="number" name="${name}" min="0" max="10" step="0.5"
-               value="${escapeHtml(value != null ? value : "")}" ${required ? "required" : ""}>
+               value="${escapeHtml(value != null ? value : "")}">
+      </div>`;
+    const personRatings = a.our_person_ratings || {};
+    const personRatingField = (id, label) => `
+      <div class="pv-rating-field">
+        <label>${label}</label>
+        <input type="number" class="pv-person-rating-input" data-person-id="${escapeHtml(id)}"
+               min="0" max="10" step="0.5"
+               value="${escapeHtml(personRatings[id] != null ? personRatings[id] : "")}">
       </div>`;
 
     return `
@@ -1333,14 +1443,12 @@ class ParkVisitsTableCard extends HTMLElement {
 
         <label class="pv-form-section">Ratings (out of 10)</label>
         <div class="pv-rating-grid">
-          ${ratingField("kids_rating", "Kids Rating", a.our_kids_rating, true)}
-          ${ratingField("mums_rating", "Mums Rating", a.our_mums_rating, false)}
-          ${ratingField("dads_rating", "Dads Rating", a.our_dads_rating, false)}
-          ${ratingField("playground_rating", "Playground", a.our_playground_rating, false)}
-          ${ratingField("scenery_rating", "Scenery", a.our_scenery_rating, false)}
-          ${ratingField("wildlife_rating", "Wildlife", a.our_wildlife_rating, false)}
-          ${ratingField("facilities_rating", "Facilities", a.our_facilities_rating, false)}
-          ${ratingField("parking_rating", "Parking", a.our_parking_rating, false)}
+          ${this._people.map((p) => personRatingField(p.id, p.name)).join("")}
+          ${ratingField("playground_rating", "Playground", a.our_playground_rating)}
+          ${ratingField("scenery_rating", "Scenery", a.our_scenery_rating)}
+          ${ratingField("wildlife_rating", "Wildlife", a.our_wildlife_rating)}
+          ${ratingField("facilities_rating", "Facilities", a.our_facilities_rating)}
+          ${ratingField("parking_rating", "Parking", a.our_parking_rating)}
         </div>
 
         <label>What we liked</label>
@@ -1448,11 +1556,15 @@ class ParkVisitsTableCard extends HTMLElement {
       // Optional rating inputs: an empty box means "not rated", not "0".
       const optionalRating = (input) => (input.value === "" ? undefined : parseFloat(input.value));
 
+      const personRatings = {};
+      form.querySelectorAll(".pv-person-rating-input").forEach((input) => {
+        const value = optionalRating(input);
+        if (value != null) personRatings[input.dataset.personId] = value;
+      });
+
       const submitted = {
-        kids_rating: parseFloat(form.kids_rating.value),
         visit_date: form.visit_date.value,
-        mums_rating: optionalRating(form.mums_rating),
-        dads_rating: optionalRating(form.dads_rating),
+        person_ratings: personRatings,
         playground_rating: optionalRating(form.playground_rating),
         scenery_rating: optionalRating(form.scenery_rating),
         wildlife_rating: optionalRating(form.wildlife_rating),
@@ -1469,8 +1581,7 @@ class ParkVisitsTableCard extends HTMLElement {
       // Mirrors the backend's Review.overall_rating property so the
       // optimistic overlay below shows the right number immediately,
       // instead of waiting for the entity state to catch up.
-      const overallValues = [submitted.kids_rating, submitted.mums_rating, submitted.dads_rating]
-        .filter((v) => v != null);
+      const overallValues = Object.values(personRatings);
       const overallRating = overallValues.length
         ? Math.round((overallValues.reduce((a, b) => a + b, 0) / overallValues.length) * 100) / 100
         : null;
@@ -1482,11 +1593,9 @@ class ParkVisitsTableCard extends HTMLElement {
         });
         this._pendingReview = {
           placeId,
-          kidsRating: submitted.kids_rating,
+          visitDate: submitted.visit_date,
           values: {
-            our_kids_rating: submitted.kids_rating,
-            our_mums_rating: submitted.mums_rating != null ? submitted.mums_rating : null,
-            our_dads_rating: submitted.dads_rating != null ? submitted.dads_rating : null,
+            our_person_ratings: personRatings,
             our_playground_rating:
               submitted.playground_rating != null ? submitted.playground_rating : null,
             our_scenery_rating: submitted.scenery_rating != null ? submitted.scenery_rating : null,

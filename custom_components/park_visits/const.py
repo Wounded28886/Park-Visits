@@ -29,6 +29,11 @@ CONF_LOCATION = "location"
 CONF_LOCATION_NAME = "location_name"
 CONF_RADIUS_KM = "radius_km"
 CONF_MAX_PARKS = "max_parks"
+# Who rates a park — configured once (setup or options) as a plain list of
+# names, e.g. ["Kids", "Mum", "Dad"] or ["Alice", "Bob", "Grandma"]. Each
+# person's stable id is util.slugify_person(name), not stored separately.
+CONF_PEOPLE = "people"
+DEFAULT_PEOPLE = ["Kids", "Mum", "Dad"]
 
 # Value used for the geo_location entity "source" attribute so dashboard
 # cards (map + list) can filter on it.
@@ -44,12 +49,11 @@ ATTR_RATING = "rating"
 ATTR_RATING_COUNT = "rating_count"
 ATTR_GOOGLE_MAPS_URI = "google_maps_uri"
 ATTR_DISTANCE_KM = "distance_km"
-# One attribute per rating "column" a review can carry, plus the computed
-# family average. kids_rating is the only one that's required when writing
-# a review — everything else is optional.
-ATTR_OUR_KIDS_RATING = "our_kids_rating"
-ATTR_OUR_MUMS_RATING = "our_mums_rating"
-ATTR_OUR_DADS_RATING = "our_dads_rating"
+# our_person_ratings carries {person_id: rating} for whoever configured
+# rated this visit — see util.slugify_person for how person_id is derived.
+# The aspect ratings below stay fixed (not per-person). Every rating is
+# optional; a review only requires a visit date.
+ATTR_OUR_PERSON_RATINGS = "our_person_ratings"
 ATTR_OUR_PLAYGROUND_RATING = "our_playground_rating"
 ATTR_OUR_SCENERY_RATING = "our_scenery_rating"
 ATTR_OUR_WILDLIFE_RATING = "our_wildlife_rating"
@@ -67,9 +71,7 @@ SERVICE_SET_NEXT_PARK = "set_next_park"
 SERVICE_CLEAR_NEXT_PARK = "clear_next_park"
 SERVICE_ATTR_FILENAME = "filename"
 SERVICE_ATTR_PLACE_ID = "place_id"
-SERVICE_ATTR_KIDS_RATING = "kids_rating"
-SERVICE_ATTR_MUMS_RATING = "mums_rating"
-SERVICE_ATTR_DADS_RATING = "dads_rating"
+SERVICE_ATTR_PERSON_RATINGS = "person_ratings"
 SERVICE_ATTR_PLAYGROUND_RATING = "playground_rating"
 SERVICE_ATTR_SCENERY_RATING = "scenery_rating"
 SERVICE_ATTR_WILDLIFE_RATING = "wildlife_rating"
@@ -129,6 +131,10 @@ SERVICE_ATTR_TAG_ID = "tag_id"
 ATTR_ROLE = "park_visits_role"
 ROLE_NEXT_PARK = "next_park"
 ROLE_LAST_VISITED = "last_visited"
+# Lets the cards find the configured people list (an attribute on this
+# sensor) without depending on its entity_id, same reasoning as the roles
+# above.
+ROLE_PARK_COUNT = "park_count"
 ATTR_SET_AT = "set_at"
 
 STORAGE_VERSION = 1
