@@ -546,17 +546,6 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         if not self.data:
             return
         for park in self.data:
-            review = reviews.get(park.place_id)
-            park.our_person_ratings = dict(review.person_ratings) if review else {}
-            park.our_playground_rating = review.playground_rating if review else None
-            park.our_scenery_rating = review.scenery_rating if review else None
-            park.our_wildlife_rating = review.wildlife_rating if review else None
-            park.our_facilities_rating = review.facilities_rating if review else None
-            park.our_parking_rating = review.parking_rating if review else None
-            park.our_overall_rating = review.overall_rating if review else None
-            park.our_note = review.note if review else ""
-            park.our_liked = review.liked if review else ""
-            park.our_disliked = review.disliked if review else ""
-            park.our_photo_count = len(review.photos) if review else 0
-            park.our_visit_date = (review.visit_date or None) if review else None
+            for field_name, value in self._review_fields(park.place_id).items():
+                setattr(park, field_name, value)
         self.async_set_updated_data(self.data)
