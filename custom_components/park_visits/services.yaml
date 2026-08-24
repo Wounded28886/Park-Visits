@@ -178,3 +178,40 @@ clear_park_tag:
       required: true
       selector:
         text:
+
+add_park:
+  name: Add a park
+  description: >-
+    Track a park the area search doesn't return — one outside the configured
+    radius, or with too few Google ratings to make the ranked list. Costs a
+    single Google Text Search, never a full refresh, and the park survives
+    every later refresh.
+  fields:
+    place_id:
+      name: Park
+      description: The Google place_id, if you already know it.
+      required: false
+      selector:
+        text:
+    query:
+      name: Search
+      description: >-
+        Name or address to look up, e.g. "Coombabah Lakelands". Google's top
+        match is added.
+      required: false
+      selector:
+        text:
+
+remove_park:
+  name: Remove a manually added park
+  description: >-
+    Stop tracking a park that was added by hand. Its review, photos and Immich
+    tag are kept — re-adding the park brings them back. Parks from the area
+    search can't be removed this way; change the radius or park count instead.
+  fields:
+    place_id:
+      name: Park
+      description: The Google place_id of the park.
+      required: true
+      selector:
+        text:

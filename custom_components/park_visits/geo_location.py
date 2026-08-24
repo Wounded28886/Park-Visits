@@ -24,6 +24,7 @@ from .const import (
     ATTR_OUR_VISIT_DATE,
     ATTR_OUR_WILDLIFE_RATING,
     ATTR_PLACE_ID,
+    ATTR_MANUALLY_ADDED,
     ATTR_RANK,
     ATTR_RATING,
     ATTR_RATING_COUNT,
@@ -127,4 +128,6 @@ class ParkGeolocationEvent(CoordinatorEntity[ParkVisitsCoordinator], Geolocation
             ATTR_OUR_DISLIKED: park.our_disliked,
             ATTR_OUR_PHOTO_COUNT: park.our_photo_count,
             ATTR_OUR_VISIT_DATE: park.our_visit_date,
+            # Lets the card badge it and offer to remove it again.
+            ATTR_MANUALLY_ADDED: park.manually_added,
         }

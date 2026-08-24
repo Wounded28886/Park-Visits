@@ -15,6 +15,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 
 from .const import (
+    CONF_API_KEY,
     CONF_IMMICH_API_KEY,
     CONF_IMMICH_MAX_ASSETS,
     CONF_IMMICH_URL,
@@ -31,22 +32,32 @@ from .const import (
     SERVICE_ATTR_PERSON_RATINGS,
     SERVICE_ATTR_PLACE_ID,
     SERVICE_ATTR_PLAYGROUND_RATING,
+    SERVICE_ATTR_QUERY,
     SERVICE_ATTR_SCENERY_RATING,
     SERVICE_ATTR_TAG_ID,
     SERVICE_ATTR_VISIT_DATE,
     SERVICE_ATTR_WILDLIFE_RATING,
+    SERVICE_ADD_PARK,
     SERVICE_CLEAR_NEXT_PARK,
     SERVICE_CLEAR_PARK_TAG,
     SERVICE_DELETE_PHOTO,
     SERVICE_DELETE_REVIEW,
     SERVICE_RATE_PARK,
+    SERVICE_REMOVE_PARK,
     SERVICE_SET_NEXT_PARK,
     SERVICE_SET_PARK_TAG,
 )
 from .coordinator import ParkVisitsCoordinator
 from .frontend import async_register_frontend
 from .immich import ImmichClient, ImmichError
-from .storage import ParkListCache, ParkPlanStore, ParkReviewStore, ParkTagStore
+from .geocoding import GeocodeError, async_search_places
+from .storage import (
+    ManualParkStore,
+    ParkListCache,
+    ParkPlanStore,
+    ParkReviewStore,
+    ParkTagStore,
+)
 from .views import async_delete_photo_files, async_register_views
 
 PLATFORMS = ["geo_location", "sensor", "button"]
@@ -98,6 +109,21 @@ SET_PARK_TAG_SCHEMA = vol.Schema(
 
 CLEAR_PARK_TAG_SCHEMA = vol.Schema({vol.Required(SERVICE_ATTR_PLACE_ID): cv.string})
 
+# Either identify the park exactly (place_id) or let Google's top match
+# decide (query). The card always sends a place_id it got from the search
+# endpoint; query exists so this is usable from an automation.
+ADD_PARK_SCHEMA = vol.Schema(
+    vol.All(
+        {
+            vol.Optional(SERVICE_ATTR_PLACE_ID): cv.string,
+            vol.Optional(SERVICE_ATTR_QUERY): cv.string,
+        },
+        cv.has_at_least_one_key(SERVICE_ATTR_PLACE_ID, SERVICE_ATTR_QUERY),
+    )
+)
+
+REMOVE_PARK_SCHEMA = vol.Schema({vol.Required(SERVICE_ATTR_PLACE_ID): cv.string})
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Park Visits from a config entry."""
@@ -107,7 +133,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     park_cache = ParkListCache(hass, entry.entry_id)
     plan = ParkPlanStore(hass, entry.entry_id)
     await plan.async_load()
-    coordinator = ParkVisitsCoordinator(hass, entry, reviews, park_cache, plan)
+    manual = ManualParkStore(hass, entry.entry_id)
+    await manual.async_load()
+    coordinator = ParkVisitsCoordinator(hass, entry, reviews, park_cache, plan, manual)
 
     # Restoring the previous park list keeps a restart free: Google is only
     # contacted when there's nothing cached for the current settings (first
@@ -203,6 +231,53 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def _async_handle_clear_park_tag(call: ServiceCall) -> None:
         await park_tags.async_clear(call.data[SERVICE_ATTR_PLACE_ID])
 
+    async def _async_handle_add_park(call: ServiceCall) -> None:
+        """Track a park the ranked search never returns.
+
+        A place_id is used as-is; free text resolves to Google's top match.
+        Either way this is one cheap Text Search at most — never a Nearby
+        Search, so adding a park doesn't touch the paid ranked query.
+        """
+        api_key = entry.options.get(CONF_API_KEY)
+        if not api_key:
+            raise HomeAssistantError("No Google Places API key is configured")
+
+        place_id = call.data.get(SERVICE_ATTR_PLACE_ID)
+        query = call.data.get(SERVICE_ATTR_QUERY)
+
+        candidate = None
+        try:
+            if query:
+                results = await async_search_places(hass, api_key, query)
+                if place_id:
+                    candidate = next(
+                        (c for c in results if c.place_id == place_id), None
+                    )
+                elif results:
+                    candidate = results[0]
+            else:
+                # Only a place_id: search for it so the name/coordinates come
+                # from Google rather than being invented here.
+                results = await async_search_places(hass, api_key, place_id)
+                candidate = next((c for c in results if c.place_id == place_id), None)
+        except GeocodeError as err:
+            raise HomeAssistantError(f"Could not reach Google: {err}") from err
+
+        if candidate is None:
+            raise HomeAssistantError(
+                f"Google returned no match for {query or place_id!r}"
+            )
+
+        await coordinator.async_add_manual_park(candidate)
+
+    async def _async_handle_remove_park(call: ServiceCall) -> None:
+        place_id = call.data[SERVICE_ATTR_PLACE_ID]
+        if not await coordinator.async_remove_manual_park(place_id):
+            raise HomeAssistantError(
+                f"'{place_id}' is not a manually added park — parks from the "
+                "area search are removed by changing the radius or park count"
+            )
+
     async def _async_handle_delete_photo(call: ServiceCall) -> None:
         place_id = call.data[SERVICE_ATTR_PLACE_ID]
         filename = call.data[SERVICE_ATTR_FILENAME]
@@ -233,9 +308,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         hass.services.async_register(
             DOMAIN,
-            SERVICE_CLEAR_NEXT_PARK,
+            SERVICE_ADD_PARK,
+    SERVICE_CLEAR_NEXT_PARK,
             _async_handle_clear_next_park,
             schema=CLEAR_NEXT_PARK_SCHEMA,
+        )
+        hass.services.async_register(
+            DOMAIN, SERVICE_ADD_PARK, _async_handle_add_park, schema=ADD_PARK_SCHEMA
+        )
+        hass.services.async_register(
+            DOMAIN, SERVICE_REMOVE_PARK, _async_handle_remove_park, schema=REMOVE_PARK_SCHEMA
         )
         hass.services.async_register(
             DOMAIN, SERVICE_SET_PARK_TAG, _async_handle_set_park_tag, schema=SET_PARK_TAG_SCHEMA
@@ -285,6 +367,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.services.async_remove(DOMAIN, SERVICE_DELETE_PHOTO)
             hass.services.async_remove(DOMAIN, SERVICE_SET_NEXT_PARK)
             hass.services.async_remove(DOMAIN, SERVICE_CLEAR_NEXT_PARK)
+            hass.services.async_remove(DOMAIN, SERVICE_ADD_PARK)
+            hass.services.async_remove(DOMAIN, SERVICE_REMOVE_PARK)
             hass.services.async_remove(DOMAIN, SERVICE_SET_PARK_TAG)
             hass.services.async_remove(DOMAIN, SERVICE_CLEAR_PARK_TAG)
     return unload_ok

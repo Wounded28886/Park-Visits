@@ -20,6 +20,7 @@ from homeassistant.helpers.storage import Store
 
 from .const import (
     IMMICH_TAG_KEY_TEMPLATE,
+    MANUAL_KEY_TEMPLATE,
     PARKS_CACHE_KEY_TEMPLATE,
     PLAN_KEY_TEMPLATE,
     STORAGE_KEY_TEMPLATE,
@@ -335,3 +336,96 @@ class ParkTagStore:
     async def async_clear(self, place_id: str) -> None:
         if self._tags.pop(place_id, None) is not None:
             await self._store.async_save(self._tags)
+
+
+class ManualParkStore:
+    """Parks added by hand, which the area search would never return.
+
+    Two reasons a park needs this: it sits outside the configured radius, or
+    it has fewer than MIN_RATING_COUNT ratings and is filtered out of the
+    ranked list. Either way it must survive a refresh, so the fields Google
+    gave us at add time are stored here rather than re-fetched — adding a
+    park costs one Text Search, ever.
+
+    ``rating``/``rating_count`` start as None/0 because the search that finds
+    these parks deliberately doesn't pay for them; async_set_rating fills
+    them in from the Place Details call that happens when the park is first
+    opened.
+    """
+
+    def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
+        self._store: Store = Store(
+            hass, STORAGE_VERSION, MANUAL_KEY_TEMPLATE.format(entry_id=entry_id)
+        )
+        self._parks: dict[str, dict[str, Any]] = {}
+
+    async def async_load(self) -> None:
+        raw = await self._store.async_load()
+        if raw:
+            self._parks = {
+                place_id: park
+                for place_id, park in raw.items()
+                if isinstance(park, dict) and park.get("name")
+            }
+
+    def all_parks(self) -> dict[str, dict[str, Any]]:
+        return {place_id: dict(park) for place_id, park in self._parks.items()}
+
+    def has(self, place_id: str) -> bool:
+        return place_id in self._parks
+
+    async def async_add(
+        self,
+        place_id: str,
+        name: str,
+        address: str,
+        latitude: float,
+        longitude: float,
+        categories: list[str] | None = None,
+        google_maps_uri: str | None = None,
+    ) -> None:
+        """Add (or refresh the details of) a manually added park."""
+        existing = self._parks.get(place_id) or {}
+        self._parks[place_id] = {
+            "name": name,
+            "address": address,
+            "latitude": latitude,
+            "longitude": longitude,
+            "categories": list(categories or []),
+            "google_maps_uri": google_maps_uri,
+            # Preserved across a re-add so a rating already learned from
+            # Place Details isn't thrown away.
+            "rating": existing.get("rating"),
+            "rating_count": existing.get("rating_count", 0),
+            "added_at": existing.get("added_at") or datetime.now(timezone.utc).isoformat(),
+        }
+        await self._store.async_save(self._parks)
+
+    async def async_set_rating(
+        self, place_id: str, rating: float | None, rating_count: int
+    ) -> bool:
+        """Record the Google rating learned from Place Details.
+
+        Returns True when something actually changed, so the caller only
+        refreshes entities when there is a reason to.
+        """
+        park = self._parks.get(place_id)
+        if park is None:
+            return False
+        if park.get("rating") == rating and park.get("rating_count") == rating_count:
+            return False
+        park["rating"] = rating
+        park["rating_count"] = rating_count
+        await self._store.async_save(self._parks)
+        return True
+
+    async def async_remove(self, place_id: str) -> bool:
+        """Stop tracking a manually added park. Its review and photos remain.
+
+        Those are keyed by place_id elsewhere, so re-adding the park later
+        reunites it with everything written about it.
+        """
+        if self._parks.pop(place_id, None) is None:
+            return False
+        await self._store.async_save(self._parks)
+        return True

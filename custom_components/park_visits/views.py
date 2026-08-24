@@ -48,6 +48,12 @@ from .const import (
     PLACES_API_PHOTO_URL,
     URL_IMMICH_TAGS,
     URL_IMMICH_THUMB,
+    URL_PARK_SEARCH,
+)
+from .geocoding import (
+    GeocodeAuthFailed,
+    GeocodeConnectionError,
+    async_search_places,
 )
 from .immich import ImmichError
 
@@ -297,6 +303,18 @@ class ParkDetailsView(HomeAssistantView):
 
         payload, photo_names = _shape_details(raw)
         self._cache.put(place_id, payload, photo_names)
+
+        # A manually added park arrives with no Google rating, because the
+        # search that found it deliberately didn't pay for one. This response
+        # has it, so hand it to the coordinator — the rating then shows in
+        # the table and the park sorts into its proper place, at no extra
+        # API cost. A no-op for every park that came from the ranked search.
+        entry_data = _entry_data(self.hass)
+        if entry_data:
+            await entry_data["coordinator"].async_note_google_rating(
+                place_id, payload.get("rating"), payload.get("rating_count") or 0
+            )
+
         return self.json(
             {**payload, "cached": False, "our_photos": self._our_photos(place_id)}
         )
@@ -446,6 +464,63 @@ class UploadPhotoView(HomeAssistantView):
         await coordinator.async_refresh_reviews()
 
         return self.json({"filename": filename})
+
+
+class ParkSearchView(HomeAssistantView):
+    """Find a place by name, so a park can be added to the list by hand.
+
+    One Google Text Search per query, on the cheap field mask — the results
+    carry no rating, which is why this costs a fraction of the ranked search
+    and why a park added here shows no rating until it is first opened.
+    """
+
+    url = URL_PARK_SEARCH
+    name = "api:park_visits:search"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+
+    async def get(self, request: web.Request) -> web.Response:
+        query = (request.query.get("q") or "").strip()
+        if len(query) < 3:
+            # Short queries match half of Google and cost the same as a good
+            # one, so they're refused rather than sent.
+            return self.json({"results": [], "error": "Type at least 3 characters"})
+
+        data = _entry_data(self.hass)
+        if not data:
+            return self.json_message("Park Visits is not configured", 503)
+        api_key = _api_key(self.hass)
+        if not api_key:
+            return self.json_message("No Google API key configured", 503)
+
+        try:
+            candidates = await async_search_places(self.hass, api_key, query)
+        except GeocodeAuthFailed:
+            return self.json({"results": [], "error": "Google rejected the API key"})
+        except GeocodeConnectionError as err:
+            _LOGGER.warning("Park search failed for %r: %s", query, err)
+            return self.json({"results": [], "error": "Couldn't reach Google"})
+
+        coordinator = data["coordinator"]
+        tracked = {p.place_id for p in (coordinator.data or [])}
+        return self.json(
+            {
+                "results": [
+                    {
+                        "place_id": c.place_id,
+                        "name": c.name,
+                        "address": c.address,
+                        "categories": c.categories,
+                        # So the card can show "already in your list" rather
+                        # than offering to add it twice.
+                        "tracked": c.place_id in tracked,
+                    }
+                    for c in candidates
+                ]
+            }
+        )
 
 
 class ImmichTagsView(HomeAssistantView):
@@ -613,5 +688,6 @@ def async_register_views(hass: HomeAssistant) -> None:
     hass.http.register_view(OurPhotoView(hass))
     hass.http.register_view(UploadPhotoView(hass))
     hass.http.register_view(GalleryView(hass))
+    hass.http.register_view(ParkSearchView(hass))
     hass.http.register_view(ImmichTagsView(hass))
     hass.http.register_view(ImmichThumbView(hass))

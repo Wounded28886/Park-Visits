@@ -25,6 +25,7 @@
  *   default_sort: rank        # any column key below
  *   default_direction: asc    # asc | desc
  *   show_filter: true
+ *   show_add_park: true      # "Add a park" button beside the filter
  *   only_visited: false       # true = only rows with a visit date
  *   show_progress: false      # true = "X / Y visited" bar above the table
  *   show_status_strip: true   # false = hide the "Last visited / Next up" strip
@@ -244,6 +245,7 @@ class ParkVisitsTableCard extends HTMLElement {
       default_sort: "rank",
       default_direction: "asc",
       show_filter: true,
+      show_add_park: true,
       only_visited: false,
       show_progress: false,
       show_status_strip: true,
@@ -698,11 +700,18 @@ class ParkVisitsTableCard extends HTMLElement {
         <div class="card-content">
           ${this.config.show_status_strip ? `<div class="pv-status-strip"></div>` : ""}
           ${this.config.show_progress ? `<div class="pv-progress"></div>` : ""}
-          ${
-            this.config.show_filter
-              ? `<input class="pv-filter" type="search" placeholder="Filter parks…" />`
-              : ""
-          }
+          <div class="pv-toolbar">
+            ${
+              this.config.show_filter
+                ? `<input class="pv-filter" type="search" placeholder="Filter parks…" />`
+                : ""
+            }
+            ${
+              this.config.show_add_park
+                ? `<button class="pv-btn pv-secondary pv-add-park">+ Add a park</button>`
+                : ""
+            }
+          </div>
           <div class="pv-scroll">
             <table class="pv-table">
               <thead><tr></tr></thead>
@@ -713,10 +722,13 @@ class ParkVisitsTableCard extends HTMLElement {
         </div>
       </ha-card>
       <div class="pv-dialog-root"></div>
+      <div class="pv-add-root"></div>
       ${STYLES}
     `;
 
     this._renderHeader();
+    const addEl = this.querySelector(".pv-add-park");
+    if (addEl) addEl.addEventListener("click", () => this._openAddPark());
     const filterEl = this.querySelector(".pv-filter");
     if (filterEl) {
       filterEl.addEventListener("input", (e) => {
@@ -863,6 +875,156 @@ class ParkVisitsTableCard extends HTMLElement {
         col ? col.label : this._sortKey
       } (${this._sortDir === "asc" ? "ascending" : "descending"})`;
     }
+  }
+
+  /* ------------------------------------------------------------ add park */
+
+  /**
+   * Add a park the ranked search never returns — one outside the radius, or
+   * with too few Google ratings to qualify.
+   *
+   * Search is on demand rather than as-you-type: every keystroke would be a
+   * billable Google Text Search, so this only queries when asked.
+   */
+  _openAddPark() {
+    this._addOpen = true;
+    this._addResults = null;
+    this._addError = "";
+    this._addBusy = false;
+    this._renderAddDialog();
+  }
+
+  _closeAddPark() {
+    this._addOpen = false;
+    const root = this.querySelector(".pv-add-root");
+    if (root) root.innerHTML = "";
+  }
+
+  async _searchParks(query) {
+    this._addBusy = true;
+    this._addError = "";
+    this._renderAddDialog();
+    try {
+      const res = await this._hass.callApi(
+        "GET",
+        `park_visits/search?q=${encodeURIComponent(query)}`
+      );
+      this._addResults = res.results || [];
+      this._addError = res.error || "";
+    } catch (err) {
+      this._addResults = [];
+      this._addError = `Search failed: ${err && err.message ? err.message : err}`;
+    } finally {
+      this._addBusy = false;
+      this._renderAddDialog();
+    }
+  }
+
+  async _addPark(placeId, name) {
+    this._addBusy = true;
+    this._renderAddDialog();
+    try {
+      await this._hass.callService("park_visits", "add_park", { place_id: placeId });
+      this._closeAddPark();
+    } catch (err) {
+      this._addError = `Couldn't add ${name}: ${err && err.message ? err.message : err}`;
+      this._addBusy = false;
+      this._renderAddDialog();
+    }
+  }
+
+  _renderAddDialog() {
+    let root = this.querySelector(".pv-add-root");
+    if (!root) return;
+    if (!this._addOpen) {
+      root.innerHTML = "";
+      return;
+    }
+
+    const results = this._addResults;
+    let body;
+    if (this._addBusy && results == null) {
+      body = `<div class="muted">Searching…</div>`;
+    } else if (results == null) {
+      body = `<div class="muted">Search for a park by name or address. Google's
+        results appear here, and the one you pick is kept through every
+        refresh.</div>`;
+    } else if (!results.length) {
+      body = `<div class="muted">No matches.</div>`;
+    } else {
+      body = `<div class="pv-add-results">${results
+        .map(
+          (r, i) => `
+          <div class="pv-add-result">
+            <div>
+              <strong>${escapeHtml(r.name)}</strong>
+              <div class="muted">${escapeHtml(r.address || "")}</div>
+              ${
+                r.categories && r.categories.length
+                  ? `<div class="categories">${r.categories
+                      .slice(0, 3)
+                      .map((c) => `<span class="chip">${escapeHtml(c)}</span>`)
+                      .join("")}</div>`
+                  : ""
+              }
+            </div>
+            ${
+              r.tracked
+                ? `<span class="muted">Already tracked</span>`
+                : `<button class="pv-btn pv-add-pick" data-index="${i}">Add</button>`
+            }
+          </div>`
+        )
+        .join("")}</div>`;
+    }
+
+    root.innerHTML = `
+      <div class="pv-backdrop pv-add-backdrop">
+        <div class="pv-dialog" role="dialog" aria-modal="true">
+          <div class="pv-dialog-head">
+            <h2>Add a park</h2>
+            <button class="pv-close pv-add-close" title="Close">✕</button>
+          </div>
+          <div class="pv-dialog-body">
+            <div class="pv-add-search">
+              <input class="pv-add-input" type="search" placeholder="Park name or address…"
+                     value="${escapeHtml(this._addQuery || "")}">
+              <button class="pv-btn pv-add-go" ${this._addBusy ? "disabled" : ""}>Search</button>
+            </div>
+            ${this._addError ? `<div class="pv-warn">${escapeHtml(this._addError)}</div>` : ""}
+            ${body}
+          </div>
+        </div>
+      </div>`;
+
+    const input = root.querySelector(".pv-add-input");
+    const go = () => {
+      const q = input.value.trim();
+      this._addQuery = q;
+      if (q.length >= 3) this._searchParks(q);
+    };
+    input.addEventListener("input", () => {
+      this._addQuery = input.value;
+    });
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        go();
+      }
+    });
+    root.querySelector(".pv-add-go").addEventListener("click", go);
+    root.querySelector(".pv-add-close").addEventListener("click", () => this._closeAddPark());
+    root.querySelector(".pv-add-backdrop").addEventListener("click", (ev) => {
+      if (ev.target.classList.contains("pv-add-backdrop")) this._closeAddPark();
+    });
+    root.querySelectorAll(".pv-add-pick").forEach((button) => {
+      button.addEventListener("click", () => {
+        const pick = (this._addResults || [])[parseInt(button.dataset.index, 10)];
+        if (pick) this._addPark(pick.place_id, pick.name);
+      });
+    });
+    // Focus lands on the box so the keyboard opens straight away on a tablet.
+    if (!this._addBusy) input.focus();
   }
 
   /* -------------------------------------------------------------- dialog */
@@ -1191,7 +1353,17 @@ class ParkVisitsTableCard extends HTMLElement {
               <button class="pv-btn pv-secondary pv-set-next">${
                 this._isNextPark(a.place_id) ? "✓ Next up" : "Set as next visit"
               }</button>
+              ${
+                a.manually_added
+                  ? `<button class="pv-btn pv-secondary pv-remove-park">Remove from list</button>`
+                  : ""
+              }
             </div>
+            ${
+              a.manually_added
+                ? `<div class="muted pv-manual-note">Added by hand — kept through every refresh.</div>`
+                : ""
+            }
 
             <h3>Our review</h3>
             ${ourReview}
@@ -1301,6 +1473,36 @@ class ParkVisitsTableCard extends HTMLElement {
           this._renderDialog();
         } catch (err) {
           setNext.disabled = false;
+        }
+      });
+    }
+
+    const removePark = root.querySelector(".pv-remove-park");
+    if (removePark) {
+      removePark.addEventListener("click", async () => {
+        if (this._busy) return;
+        if (
+          !window.confirm(
+            `Remove ${a.friendly_name} from the list?
+
+` +
+              "Our review, photos and Immich tag are kept — adding the park " +
+              "again brings them back."
+          )
+        ) {
+          return;
+        }
+        this._busy = true;
+        removePark.disabled = true;
+        try {
+          await this._hass.callService("park_visits", "remove_park", {
+            place_id: a.place_id,
+          });
+          this._closeDialog();
+        } catch (err) {
+          removePark.disabled = false;
+        } finally {
+          this._busy = false;
         }
       });
     }
@@ -1751,6 +1953,22 @@ const STYLES = `
     border-radius: 12px; padding: 1px 8px; margin: 1px 4px 1px 0;
     font-size: 12px; white-space: nowrap;
   }
+  .pv-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .pv-toolbar .pv-filter { margin-bottom: 0; flex: 1 1 auto; }
+  .pv-add-park { flex: 0 0 auto; white-space: nowrap; }
+  .pv-manual-note { margin-top: 6px; font-size: 12px; }
+  .pv-add-search { display: flex; gap: 8px; margin-bottom: 12px; }
+  .pv-add-search .pv-add-input {
+    flex: 1 1 auto; padding: 8px; font: inherit; border-radius: 6px;
+    border: 1px solid var(--divider-color, #333);
+    background: var(--primary-background-color, #111); color: var(--primary-text-color, #eee);
+  }
+  .pv-add-results { display: flex; flex-direction: column; }
+  .pv-add-result {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--divider-color, #2a2a2a);
+  }
+  .pv-add-result:last-child { border-bottom: none; }
   .pv-filter {
     width: 100%; box-sizing: border-box; margin-bottom: 8px; padding: 6px 8px;
     border-radius: 6px; border: 1px solid var(--divider-color, #333);

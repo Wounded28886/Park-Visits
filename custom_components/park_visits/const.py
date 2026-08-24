@@ -103,8 +103,34 @@ URL_DETAILS = "/api/park_visits/details/{place_id}"
 URL_GOOGLE_PHOTO = "/api/park_visits/google_photo/{place_id}/{index}"
 URL_OUR_PHOTO = "/api/park_visits/photo/{place_id}/{filename}"
 URL_UPLOAD = "/api/park_visits/upload/{place_id}"
+URL_PARK_SEARCH = "/api/park_visits/search"
 URL_IMMICH_TAGS = "/api/park_visits/immich/tags"
 URL_IMMICH_THUMB = "/api/park_visits/immich/thumb/{size}/{asset_id}"
+
+# Manually added parks
+# A park the search area misses — too far out, or too thinly rated to clear
+# MIN_RATING_COUNT — can be added by hand. Stored separately from the fetched
+# list so a refresh never drops it, and so adding one costs no Nearby Search.
+MANUAL_KEY_TEMPLATE = f"{DOMAIN}_manual_{{entry_id}}"
+SERVICE_ADD_PARK = "add_park"
+SERVICE_REMOVE_PARK = "remove_park"
+SERVICE_ATTR_QUERY = "query"
+ATTR_MANUALLY_ADDED = "manually_added"
+MAX_SEARCH_RESULTS = 8
+# Deliberately omits rating/userRatingCount: asking for those moves Text
+# Search onto a pricier SKU. A manually added park therefore arrives without
+# a Google rating, and ParkDetailsView fills it in the first time the park is
+# opened — a call that already happens and is already cached for 24 hours.
+PLACES_SEARCH_FIELD_MASK = ",".join(
+    [
+        "places.id",
+        "places.displayName",
+        "places.formattedAddress",
+        "places.location",
+        "places.types",
+        "places.googleMapsUri",
+    ]
+)
 
 # Immich
 IMMICH_TAG_KEY_TEMPLATE = f"{DOMAIN}_immich_tags_{{entry_id}}"

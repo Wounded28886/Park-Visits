@@ -42,7 +42,7 @@ from .const import (
     PLACES_API_MAX_TILE_RADIUS_KM,
     PLACES_API_NOISE_TYPES,
 )
-from .storage import ParkListCache, ParkPlanStore, ParkReviewStore
+from .storage import ManualParkStore, ParkListCache, ParkPlanStore, ParkReviewStore
 from .util import destination_point, haversine_km
 
 _LOGGER = logging.getLogger(__name__)
@@ -76,6 +76,8 @@ class RankedPark:
     our_disliked: str
     our_photo_count: int
     our_visit_date: str | None
+    # Defaulted so a park list cached by an earlier version still loads.
+    manually_added: bool = False
 
 
 def _tile_centers(
@@ -116,6 +118,7 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         reviews: ParkReviewStore,
         park_cache: ParkListCache,
         plan: ParkPlanStore,
+        manual: ManualParkStore,
     ) -> None:
         super().__init__(
             hass,
@@ -127,6 +130,10 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         self.reviews = reviews
         self.park_cache = park_cache
         self.plan = plan
+        self.manual = manual
+        # The fetched list, before manual parks are folded in. Kept so
+        # adding or removing one can re-merge without re-querying Google.
+        self._fetched: list[RankedPark] = []
 
     def settings_fingerprint(self) -> str:
         """Identifies the search parameters a cached park list was fetched with."""
@@ -169,7 +176,12 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         if not parks:
             return False
 
-        self.async_set_updated_data(parks)
+        # Manual parks are merged on top of the cache rather than stored in
+        # it: the cache belongs to the Google search and is keyed by the
+        # search settings, so folding them in would mean adding a park could
+        # invalidate the cache and trigger a paid refresh.
+        self._fetched = parks
+        self.async_set_updated_data(self._merge_manual(parks))
         await self.async_refresh_reviews()
         return True
 
@@ -234,7 +246,6 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
                 if place_id and place_id not in places_by_id:
                     places_by_id[place_id] = place
 
-        reviews = self.reviews.all_reviews()
         candidates: list[dict[str, Any]] = []
         for place_id, place in places_by_id.items():
             location = place.get("location", {})
@@ -247,7 +258,6 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
                 for t in place.get("types", [])
                 if t not in PLACES_API_NOISE_TYPES
             ]
-            review = reviews.get(place_id)
             candidates.append(
                 {
                     "place_id": place_id,
@@ -260,18 +270,7 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
                     "rating_count": place.get("userRatingCount", 0),
                     "google_maps_uri": place.get("googleMapsUri"),
                     "distance_km": haversine_km(center_lat, center_lon, lat, lon),
-                    "our_person_ratings": dict(review.person_ratings) if review else {},
-                    "our_playground_rating": review.playground_rating if review else None,
-                    "our_scenery_rating": review.scenery_rating if review else None,
-                    "our_wildlife_rating": review.wildlife_rating if review else None,
-                    "our_facilities_rating": review.facilities_rating if review else None,
-                    "our_parking_rating": review.parking_rating if review else None,
-                    "our_overall_rating": review.overall_rating if review else None,
-                    "our_note": review.note if review else "",
-                    "our_liked": review.liked if review else "",
-                    "our_disliked": review.disliked if review else "",
-                    "our_photo_count": len(review.photos) if review else 0,
-                    "our_visit_date": (review.visit_date or None) if review else None,
+                    **self._review_fields(place_id),
                 }
             )
 
@@ -297,10 +296,122 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
             result.append(RankedPark(rank=display_rank, unique_id=unique_id, **park))
 
         # Persist so the next restart doesn't re-run this (paid) search.
+        # Only what Google returned is cached — see _merge_manual.
         await self.park_cache.async_save(
             self.settings_fingerprint(), [asdict(p) for p in result]
         )
-        return result
+        self._fetched = result
+        return self._merge_manual(result)
+
+    def _review_fields(self, place_id: str) -> dict[str, Any]:
+        """Our own review for a park, in the shape RankedPark expects."""
+        review = self.reviews.get(place_id)
+        return {
+            "our_person_ratings": dict(review.person_ratings) if review else {},
+            "our_playground_rating": review.playground_rating if review else None,
+            "our_scenery_rating": review.scenery_rating if review else None,
+            "our_wildlife_rating": review.wildlife_rating if review else None,
+            "our_facilities_rating": review.facilities_rating if review else None,
+            "our_parking_rating": review.parking_rating if review else None,
+            "our_overall_rating": review.overall_rating if review else None,
+            "our_note": review.note if review else "",
+            "our_liked": review.liked if review else "",
+            "our_disliked": review.disliked if review else "",
+            "our_photo_count": len(review.photos) if review else 0,
+            "our_visit_date": (review.visit_date or None) if review else None,
+        }
+
+    def _merge_manual(self, fetched: list[RankedPark]) -> list[RankedPark]:
+        """Fold manually added parks into the fetched list and renumber.
+
+        Deliberately applied *after* MIN_RATING_COUNT and the max_parks cap:
+        a park added by hand was chosen on purpose, so neither the ranking
+        rules nor the size limit may drop it. A park Google already returned
+        is only flagged, not duplicated.
+        """
+        manual = self.manual.all_parks()
+        options = self.entry.options
+        center_lat = options.get(CONF_LATITUDE)
+        center_lon = options.get(CONF_LONGITUDE)
+
+        combined = list(fetched)
+        already = {p.place_id for p in fetched}
+        # Assigned rather than only set: these are the same objects held in
+        # _fetched, so a park that was manual last time round has to be
+        # cleared when it no longer is, and ranks have to be renumbered even
+        # when nothing is manual — otherwise removing the last manual park
+        # leaves everything renumbered around a gap.
+        for park in combined:
+            park.manually_added = park.place_id in manual
+
+        for place_id, park in manual.items():
+            if place_id in already:
+                continue
+            distance = (
+                haversine_km(center_lat, center_lon, park["latitude"], park["longitude"])
+                if center_lat is not None and center_lon is not None
+                else 0.0
+            )
+            combined.append(
+                RankedPark(
+                    place_id=place_id,
+                    unique_id=place_id,
+                    rank=0,  # replaced by the renumber below
+                    name=park["name"],
+                    address=park.get("address", ""),
+                    latitude=park["latitude"],
+                    longitude=park["longitude"],
+                    categories=list(park.get("categories") or []),
+                    rating=park.get("rating"),
+                    rating_count=park.get("rating_count", 0),
+                    google_maps_uri=park.get("google_maps_uri"),
+                    distance_km=distance,
+                    manually_added=True,
+                    **self._review_fields(place_id),
+                )
+            )
+
+        # Same ordering rule as the fetched list, so a manually added park
+        # sits where its rating says it should. One with no rating yet sorts
+        # last until Place Details fills it in.
+        combined.sort(
+            key=lambda p: (p.rating is None, -(p.rating or 0), -(p.rating_count or 0))
+        )
+        for index, park in enumerate(combined, start=1):
+            park.rank = index
+        return combined
+
+    async def async_add_manual_park(self, candidate: Any) -> None:
+        """Track a park found by search, and show it immediately."""
+        await self.manual.async_add(
+            place_id=candidate.place_id,
+            name=candidate.name,
+            address=candidate.address,
+            latitude=candidate.latitude,
+            longitude=candidate.longitude,
+            categories=candidate.categories,
+            google_maps_uri=candidate.google_maps_uri,
+        )
+        self.async_set_updated_data(self._merge_manual(self._fetched))
+
+    async def async_remove_manual_park(self, place_id: str) -> bool:
+        """Stop tracking a manually added park (its review is left alone)."""
+        removed = await self.manual.async_remove(place_id)
+        if removed:
+            self.async_set_updated_data(self._merge_manual(self._fetched))
+        return removed
+
+    async def async_note_google_rating(
+        self, place_id: str, rating: float | None, rating_count: int
+    ) -> None:
+        """Record a rating learned from Place Details for a manual park.
+
+        The search that adds these parks doesn't pay for ratings, so this is
+        where one arrives — free, off the back of the details call the card
+        already makes when a park is opened.
+        """
+        if await self.manual.async_set_rating(place_id, rating, rating_count):
+            self.async_set_updated_data(self._merge_manual(self._fetched))
 
     def park_name(self, place_id: str) -> str:
         """Current display name for a park, if it's still tracked."""
@@ -434,7 +545,6 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         """
         if not self.data:
             return
-        reviews = self.reviews.all_reviews()
         for park in self.data:
             review = reviews.get(park.place_id)
             park.our_person_ratings = dict(review.person_ratings) if review else {}

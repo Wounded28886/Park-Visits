@@ -73,6 +73,33 @@ every visited park.
   don't have to be uploaded into Home Assistant at all — see
   [Photos from Immich](#photos-from-immich).
 
+## Adding a park by hand
+
+The ranked search only returns parks inside the configured radius that clear
+`MIN_RATING_COUNT`. A local park can fail both tests and still be one you
+visit, so **+ Add a park** on the table card searches Google by name or
+address and tracks whichever result you pick.
+
+A park added this way is deliberately exempt from the rules that built the
+list: the minimum-rating filter doesn't apply to it, and it isn't subject to
+the park-count cap. It's stored separately from the fetched list, so every
+later refresh keeps it.
+
+Cost is one Google **Text Search** per search you run — never a Nearby
+Search, and nothing on refresh. That search uses the cheap field mask, which
+excludes ratings, so a newly added park shows no Google rating and sorts last
+until you open it; the Place Details call that already happens then fills the
+rating in and the park sorts into its proper place. Searching only happens
+when you press Search, not per keystroke, for the same reason.
+
+Removing one (**Remove from list** in its popup) keeps its review, photos and
+Immich tag — they're keyed by place_id, so adding the park again reunites
+them. Parks from the area search can't be removed this way; change the radius
+or park count instead.
+
+Two services back it: **`add_park`** (`place_id`, or `query` for Google's top
+match) and **`remove_park`** (`place_id`).
+
 ## How photos and reviews are handled
 
 Google's reviews and photos are **not** part of the bulk park search — they
