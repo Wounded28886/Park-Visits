@@ -16,6 +16,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     GEOCODE_API_URL,
+    PLACES_ADD_FIELD_MASK,
+    PLACES_API_DETAILS_URL,
     GEOCODE_FIELD_MASK,
     MAX_SEARCH_RESULTS,
     PLACES_API_NOISE_TYPES,
@@ -105,6 +107,10 @@ class PlaceCandidate:
     longitude: float
     categories: list[str]
     google_maps_uri: str | None
+    # Only populated when the place was resolved by id via Place Details —
+    # the search mask deliberately doesn't pay for these.
+    rating: float | None = None
+    rating_count: int = 0
 
 
 async def async_search_places(
@@ -169,3 +175,58 @@ async def async_search_places(
             )
         )
     return results
+
+
+async def async_place_details(
+    hass: HomeAssistant, api_key: str, place_id: str
+) -> PlaceCandidate:
+    """Resolve a place_id to a place.
+
+    Text Search matches names and addresses, so it can never find a place by
+    id — this is the endpoint for that. The field mask leaves out reviews and
+    photos (what makes the card's details call expensive) but keeps the
+    rating, so a park added this way is immediately sortable.
+    """
+    session = async_get_clientsession(hass)
+    try:
+        async with session.get(
+            PLACES_API_DETAILS_URL.format(place_id=place_id),
+            headers={
+                "X-Goog-Api-Key": api_key,
+                "X-Goog-FieldMask": PLACES_ADD_FIELD_MASK,
+            },
+            timeout=aiohttp.ClientTimeout(total=15),
+        ) as response:
+            if response.status in (401, 403):
+                raise GeocodeAuthFailed(f"Google rejected the request ({response.status})")
+            if response.status == 404:
+                raise GeocodeNotFound(place_id)
+            if response.status != 200:
+                text = await response.text()
+                raise GeocodeConnectionError(
+                    f"Google Places API error {response.status}: {text[:200]}"
+                )
+            place = await response.json()
+    except aiohttp.ClientError as err:
+        raise GeocodeConnectionError(str(err)) from err
+
+    location = place.get("location") or {}
+    latitude, longitude = location.get("latitude"), location.get("longitude")
+    if latitude is None or longitude is None:
+        raise GeocodeNotFound(place_id)
+
+    return PlaceCandidate(
+        place_id=place.get("id") or place_id,
+        name=(place.get("displayName") or {}).get("text") or "Unnamed place",
+        address=place.get("formattedAddress", ""),
+        latitude=latitude,
+        longitude=longitude,
+        categories=[
+            t.replace("_", " ").title()
+            for t in place.get("types", [])
+            if t not in PLACES_API_NOISE_TYPES
+        ],
+        google_maps_uri=place.get("googleMapsUri"),
+        rating=place.get("rating"),
+        rating_count=place.get("userRatingCount", 0),
+    )

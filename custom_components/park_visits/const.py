@@ -121,6 +121,23 @@ MAX_SEARCH_RESULTS = 8
 # Search onto a pricier SKU. A manually added park therefore arrives without
 # a Google rating, and ParkDetailsView fills it in the first time the park is
 # opened — a call that already happens and is already cached for 24 hours.
+# Resolving a place_id has to use Place Details — Text Search matches names
+# and addresses, never ids. This mask deliberately omits reviews and photos
+# (the expensive part of PLACES_API_DETAILS_FIELD_MASK) but does include the
+# rating, so a park added by id sorts correctly straight away instead of
+# waiting to be opened.
+PLACES_ADD_FIELD_MASK = ",".join(
+    [
+        "id",
+        "displayName",
+        "formattedAddress",
+        "location",
+        "types",
+        "rating",
+        "userRatingCount",
+        "googleMapsUri",
+    ]
+)
 PLACES_SEARCH_FIELD_MASK = ",".join(
     [
         "places.id",

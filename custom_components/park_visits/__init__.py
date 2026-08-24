@@ -50,7 +50,7 @@ from .const import (
 from .coordinator import ParkVisitsCoordinator
 from .frontend import async_register_frontend
 from .immich import ImmichClient, ImmichError
-from .geocoding import GeocodeError, async_search_places
+from .geocoding import GeocodeError, async_place_details, async_search_places
 from .storage import (
     ManualParkStore,
     ParkListCache,
@@ -247,26 +247,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         candidate = None
         try:
-            if query:
-                results = await async_search_places(hass, api_key, query)
-                if place_id:
-                    candidate = next(
-                        (c for c in results if c.place_id == place_id), None
-                    )
-                elif results:
-                    candidate = results[0]
+            if place_id:
+                # Place Details, not Text Search: searching for an id as
+                # though it were a name matches nothing, which is exactly how
+                # this failed when the card (which always sends an id) used
+                # it. Details also returns the rating, so a park added this
+                # way sorts correctly straight away.
+                candidate = await async_place_details(hass, api_key, place_id)
             else:
-                # Only a place_id: search for it so the name/coordinates come
-                # from Google rather than being invented here.
-                results = await async_search_places(hass, api_key, place_id)
-                candidate = next((c for c in results if c.place_id == place_id), None)
+                results = await async_search_places(hass, api_key, query)
+                if results:
+                    candidate = results[0]
         except GeocodeError as err:
-            raise HomeAssistantError(f"Could not reach Google: {err}") from err
+            raise HomeAssistantError(f"Google couldn't resolve that park: {err}") from err
 
         if candidate is None:
-            raise HomeAssistantError(
-                f"Google returned no match for {query or place_id!r}"
-            )
+            raise HomeAssistantError(f"Google returned no match for {query!r}")
 
         await coordinator.async_add_manual_park(candidate)
 

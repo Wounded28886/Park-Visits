@@ -383,8 +383,15 @@ class ManualParkStore:
         longitude: float,
         categories: list[str] | None = None,
         google_maps_uri: str | None = None,
+        rating: float | None = None,
+        rating_count: int = 0,
     ) -> None:
-        """Add (or refresh the details of) a manually added park."""
+        """Add (or refresh the details of) a manually added park.
+
+        A rating is optional because it depends how the park was found: an
+        id resolves via Place Details, which returns one, while a text search
+        deliberately doesn't pay for it.
+        """
         existing = self._parks.get(place_id) or {}
         self._parks[place_id] = {
             "name": name,
@@ -393,10 +400,10 @@ class ManualParkStore:
             "longitude": longitude,
             "categories": list(categories or []),
             "google_maps_uri": google_maps_uri,
-            # Preserved across a re-add so a rating already learned from
-            # Place Details isn't thrown away.
-            "rating": existing.get("rating"),
-            "rating_count": existing.get("rating_count", 0),
+            # A freshly supplied rating wins; otherwise keep whatever was
+            # already learned, so a re-add never throws one away.
+            "rating": rating if rating is not None else existing.get("rating"),
+            "rating_count": rating_count or existing.get("rating_count", 0),
             "added_at": existing.get("added_at") or datetime.now(timezone.utc).isoformat(),
         }
         await self._store.async_save(self._parks)

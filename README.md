@@ -85,12 +85,17 @@ list: the minimum-rating filter doesn't apply to it, and it isn't subject to
 the park-count cap. It's stored separately from the fetched list, so every
 later refresh keeps it.
 
-Cost is one Google **Text Search** per search you run — never a Nearby
-Search, and nothing on refresh. That search uses the cheap field mask, which
-excludes ratings, so a newly added park shows no Google rating and sorts last
-until you open it; the Place Details call that already happens then fills the
-rating in and the park sorts into its proper place. Searching only happens
-when you press Search, not per keystroke, for the same reason.
+Cost is one Google **Text Search** per search you run, plus one **Place
+Details** call for the park you actually add — never a Nearby Search, and
+nothing on refresh. Searching only happens when you press Search, not per
+keystroke, for the same reason.
+
+Resolving the park you pick uses Place Details rather than the search
+results, because a place_id can only be looked up that way — Text Search
+matches names and addresses, never ids. That call uses a reduced field mask
+without reviews or photos (the expensive part of the card's own details
+call) but with the rating, so an added park sorts into its proper place
+immediately.
 
 Removing one (**Remove from list** in its popup) keeps its review, photos and
 Immich tag — they're keyed by place_id, so adding the park again reunites

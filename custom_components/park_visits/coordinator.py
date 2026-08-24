@@ -391,6 +391,10 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
             longitude=candidate.longitude,
             categories=candidate.categories,
             google_maps_uri=candidate.google_maps_uri,
+            # Present when the park was resolved by id; 0/None from a text
+            # search, and filled in later by async_note_google_rating.
+            rating=getattr(candidate, "rating", None),
+            rating_count=getattr(candidate, "rating_count", 0),
         )
         self.async_set_updated_data(self._merge_manual(self._fetched))
 
