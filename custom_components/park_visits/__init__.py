@@ -308,8 +308,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         hass.services.async_register(
             DOMAIN,
-            SERVICE_ADD_PARK,
-    SERVICE_CLEAR_NEXT_PARK,
+            SERVICE_CLEAR_NEXT_PARK,
             _async_handle_clear_next_park,
             schema=CLEAR_NEXT_PARK_SCHEMA,
         )
