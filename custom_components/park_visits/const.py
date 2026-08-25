@@ -104,6 +104,7 @@ URL_GOOGLE_PHOTO = "/api/park_visits/google_photo/{place_id}/{index}"
 URL_OUR_PHOTO = "/api/park_visits/photo/{place_id}/{filename}"
 URL_UPLOAD = "/api/park_visits/upload/{place_id}"
 URL_PARK_SEARCH = "/api/park_visits/search"
+URL_REMOVED_PARKS = "/api/park_visits/removed"
 URL_IMMICH_TAGS = "/api/park_visits/immich/tags"
 URL_IMMICH_THUMB = "/api/park_visits/immich/thumb/{size}/{asset_id}"
 
@@ -111,6 +112,13 @@ URL_IMMICH_THUMB = "/api/park_visits/immich/thumb/{size}/{asset_id}"
 # A park the search area misses — too far out, or too thinly rated to clear
 # MIN_RATING_COUNT — can be added by hand. Stored separately from the fetched
 # list so a refresh never drops it, and so adding one costs no Nearby Search.
+# Parks removed from the list by hand. Kept as its own list rather than
+# deleted from anything, because the ranked search would simply return them
+# again on the next refresh — and because a removal has to be reversible
+# without spending another Google call to rebuild the park.
+HIDDEN_KEY_TEMPLATE = f"{DOMAIN}_hidden_{{entry_id}}"
+SERVICE_RESTORE_PARK = "restore_park"
+
 MANUAL_KEY_TEMPLATE = f"{DOMAIN}_manual_{{entry_id}}"
 SERVICE_ADD_PARK = "add_park"
 SERVICE_REMOVE_PARK = "remove_park"

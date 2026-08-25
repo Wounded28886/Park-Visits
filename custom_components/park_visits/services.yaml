@@ -203,11 +203,25 @@ add_park:
         text:
 
 remove_park:
-  name: Remove a manually added park
+  name: Remove a park
   description: >-
-    Stop tracking a park that was added by hand. Its review, photos and Immich
-    tag are kept — re-adding the park brings them back. Parks from the area
-    search can't be removed this way; change the radius or park count instead.
+    Remove any park from the list. The removal is recorded, so a refresh
+    doesn't bring it back — restore_park (or Add a park → Removed parks) puts
+    it back, free. Its review, photos and Immich tag are kept either way.
+  fields:
+    place_id:
+      name: Park
+      description: The Google place_id of the park.
+      required: true
+      selector:
+        text:
+
+restore_park:
+  name: Restore a removed park
+  description: >-
+    Put back a park that was removed from the list. Free — the park is still
+    in the fetched list, just filtered out of the displayed one, so nothing
+    is re-fetched from Google.
   fields:
     place_id:
       name: Park

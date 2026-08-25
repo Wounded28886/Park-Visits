@@ -892,6 +892,34 @@ class ParkVisitsTableCard extends HTMLElement {
     this._addError = "";
     this._addBusy = false;
     this._renderAddDialog();
+    this._loadRemoved();
+  }
+
+  /** Removed parks, so they can be put back. Costs nothing — no Google. */
+  async _loadRemoved() {
+    try {
+      const res = await this._hass.callApi("GET", "park_visits/removed");
+      this._removed = res.parks || [];
+    } catch (err) {
+      this._removed = [];
+    }
+    if (this._addOpen) this._renderAddDialog();
+  }
+
+  async _restorePark(placeId) {
+    this._addBusy = true;
+    this._renderAddDialog();
+    try {
+      await this._hass.callService("park_visits", "restore_park", {
+        place_id: placeId,
+      });
+      this._removed = (this._removed || []).filter((p) => p.place_id !== placeId);
+    } catch (err) {
+      this._addError = `Couldn't restore: ${err && err.message ? err.message : err}`;
+    } finally {
+      this._addBusy = false;
+      this._renderAddDialog();
+    }
   }
 
   _closeAddPark() {
@@ -931,6 +959,35 @@ class ParkVisitsTableCard extends HTMLElement {
       this._addBusy = false;
       this._renderAddDialog();
     }
+  }
+
+  /**
+   * The "Removed parks" section of the add dialog.
+   *
+   * Restoring is instant and free: a removed park is still in the fetched
+   * list, just filtered out of the displayed one, so putting it back never
+   * costs a Google call.
+   */
+  _removedHtml() {
+    const removed = this._removed || [];
+    if (!removed.length) return "";
+    return `
+      <h3 class="pv-removed-head">Removed parks (${removed.length})</h3>
+      <div class="pv-add-results">
+        ${removed
+          .map(
+            (p) => `
+          <div class="pv-add-result">
+            <div>
+              <strong>${escapeHtml(p.name || "Unnamed park")}</strong>
+              <div class="muted">Removed ${escapeHtml(formatLocalDate((p.hidden_at || "").slice(0, 10)))}</div>
+            </div>
+            <button class="pv-btn pv-secondary pv-restore"
+                    data-place-id="${escapeHtml(p.place_id)}">Restore</button>
+          </div>`
+          )
+          .join("")}
+      </div>`;
   }
 
   _renderAddDialog() {
@@ -993,6 +1050,7 @@ class ParkVisitsTableCard extends HTMLElement {
             </div>
             ${this._addError ? `<div class="pv-warn">${escapeHtml(this._addError)}</div>` : ""}
             ${body}
+            ${this._removedHtml()}
           </div>
         </div>
       </div>`;
@@ -1016,6 +1074,9 @@ class ParkVisitsTableCard extends HTMLElement {
     root.querySelector(".pv-add-close").addEventListener("click", () => this._closeAddPark());
     root.querySelector(".pv-add-backdrop").addEventListener("click", (ev) => {
       if (ev.target.classList.contains("pv-add-backdrop")) this._closeAddPark();
+    });
+    root.querySelectorAll(".pv-restore").forEach((button) => {
+      button.addEventListener("click", () => this._restorePark(button.dataset.placeId));
     });
     root.querySelectorAll(".pv-add-pick").forEach((button) => {
       button.addEventListener("click", () => {
@@ -1353,11 +1414,7 @@ class ParkVisitsTableCard extends HTMLElement {
               <button class="pv-btn pv-secondary pv-set-next">${
                 this._isNextPark(a.place_id) ? "✓ Next up" : "Set as next visit"
               }</button>
-              ${
-                a.manually_added
-                  ? `<button class="pv-btn pv-secondary pv-remove-park">Remove from list</button>`
-                  : ""
-              }
+              <button class="pv-btn pv-secondary pv-remove-park">Remove from list</button>
             </div>
             ${
               a.manually_added
@@ -1483,11 +1540,10 @@ class ParkVisitsTableCard extends HTMLElement {
         if (this._busy) return;
         if (
           !window.confirm(
-            `Remove ${a.friendly_name} from the list?
-
-` +
-              "Our review, photos and Immich tag are kept — adding the park " +
-              "again brings them back."
+            `Remove ${a.friendly_name} from the list?\n\n` +
+              "It stays gone through refreshes, and you can put it back from " +
+              "Add a park → Removed parks.\n\n" +
+              "Our review, photos and Immich tag are kept either way."
           )
         ) {
           return;
@@ -1969,6 +2025,7 @@ const STYLES = `
     padding: 10px 0; border-bottom: 1px solid var(--divider-color, #2a2a2a);
   }
   .pv-add-result:last-child { border-bottom: none; }
+  .pv-removed-head { margin-top: 20px; }
   .pv-filter {
     width: 100%; box-sizing: border-box; margin-bottom: 8px; padding: 6px 8px;
     border-radius: 6px; border: 1px solid var(--divider-color, #333);

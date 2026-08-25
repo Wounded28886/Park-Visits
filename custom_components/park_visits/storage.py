@@ -19,6 +19,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import (
+    HIDDEN_KEY_TEMPLATE,
     IMMICH_TAG_KEY_TEMPLATE,
     MANUAL_KEY_TEMPLATE,
     PARKS_CACHE_KEY_TEMPLATE,
@@ -435,4 +436,56 @@ class ManualParkStore:
         if self._parks.pop(place_id, None) is None:
             return False
         await self._store.async_save(self._parks)
+        return True
+
+
+class HiddenParkStore:
+    """Parks removed from the list by hand.
+
+    Removal can't just drop a park: the ranked search returns whatever it
+    returns, so anything deleted would be back after the next refresh. This
+    records the decision instead, and the coordinator filters against it.
+
+    The park's name is kept alongside its id purely so removed parks can be
+    listed for restoring — by then the park isn't in the tracked list any
+    more, so there's nowhere else to read a name from.
+    """
+
+    def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
+        self._store: Store = Store(
+            hass, STORAGE_VERSION, HIDDEN_KEY_TEMPLATE.format(entry_id=entry_id)
+        )
+        self._hidden: dict[str, dict[str, Any]] = {}
+
+    async def async_load(self) -> None:
+        raw = await self._store.async_load()
+        if raw:
+            self._hidden = {
+                place_id: value
+                for place_id, value in raw.items()
+                if isinstance(value, dict)
+            }
+
+    def is_hidden(self, place_id: str) -> bool:
+        return place_id in self._hidden
+
+    def all_hidden(self) -> dict[str, dict[str, Any]]:
+        return {place_id: dict(value) for place_id, value in self._hidden.items()}
+
+    async def async_hide(self, place_id: str, name: str = "") -> bool:
+        """Remove a park from the list. True if it wasn't already removed."""
+        if place_id in self._hidden:
+            return False
+        self._hidden[place_id] = {
+            "name": name,
+            "hidden_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await self._store.async_save(self._hidden)
+        return True
+
+    async def async_unhide(self, place_id: str) -> bool:
+        """Put a park back. True if it was actually removed beforehand."""
+        if self._hidden.pop(place_id, None) is None:
+            return False
+        await self._store.async_save(self._hidden)
         return True

@@ -97,13 +97,24 @@ without reviews or photos (the expensive part of the card's own details
 call) but with the rating, so an added park sorts into its proper place
 immediately.
 
-Removing one (**Remove from list** in its popup) keeps its review, photos and
-Immich tag — they're keyed by place_id, so adding the park again reunites
-them. Parks from the area search can't be removed this way; change the radius
-or park count instead.
+## Removing a park
 
-Two services back it: **`add_park`** (`place_id`, or `query` for Google's top
-match) and **`remove_park`** (`place_id`).
+**Remove from list** in any park's popup takes it out of the list — parks
+from the ranked search as well as manually added ones.
+
+The removal is *recorded* rather than applied by deleting anything, because
+the ranked search has no idea a park was removed and returns it again on the
+next refresh. The park stays in the fetched list and is filtered out of the
+displayed one, which is also what makes putting it back instant and free:
+**Add a park → Removed parks → Restore** never re-queries Google.
+
+A park's review, photos and Immich tag are untouched by removal. They're all
+keyed by place_id, so restoring reunites the park with everything written
+about it.
+
+Three services back this: **`add_park`** (`place_id`, or `query` for Google's
+top match — also restores a removed park), **`remove_park`** (`place_id`) and
+**`restore_park`** (`place_id`).
 
 ## How photos and reviews are handled
 

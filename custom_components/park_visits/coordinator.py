@@ -42,7 +42,13 @@ from .const import (
     PLACES_API_MAX_TILE_RADIUS_KM,
     PLACES_API_NOISE_TYPES,
 )
-from .storage import ManualParkStore, ParkListCache, ParkPlanStore, ParkReviewStore
+from .storage import (
+    HiddenParkStore,
+    ManualParkStore,
+    ParkListCache,
+    ParkPlanStore,
+    ParkReviewStore,
+)
 from .util import destination_point, haversine_km
 
 _LOGGER = logging.getLogger(__name__)
@@ -119,6 +125,7 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         park_cache: ParkListCache,
         plan: ParkPlanStore,
         manual: ManualParkStore,
+        hidden: HiddenParkStore,
     ) -> None:
         super().__init__(
             hass,
@@ -131,6 +138,7 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         self.park_cache = park_cache
         self.plan = plan
         self.manual = manual
+        self.hidden = hidden
         # The fetched list, before manual parks are folded in. Kept so
         # adding or removing one can re-merge without re-querying Google.
         self._fetched: list[RankedPark] = []
@@ -371,6 +379,13 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
                 )
             )
 
+        # Removed parks drop out here, after everything else has been folded
+        # in: the ranked search has no idea a park was removed and returns it
+        # every time, so this is the only place the decision can be applied.
+        # They stay in _fetched, which is what lets a restore be instant and
+        # free rather than another Google call.
+        combined = [p for p in combined if not self.hidden.is_hidden(p.place_id)]
+
         # Same ordering rule as the fetched list, so a manually added park
         # sits where its rating says it should. One with no rating yet sorts
         # last until Place Details fills it in.
@@ -398,12 +413,51 @@ class ParkVisitsCoordinator(DataUpdateCoordinator[list[RankedPark]]):
         )
         self.async_set_updated_data(self._merge_manual(self._fetched))
 
-    async def async_remove_manual_park(self, place_id: str) -> bool:
-        """Stop tracking a manually added park (its review is left alone)."""
-        removed = await self.manual.async_remove(place_id)
-        if removed:
+    async def async_remove_park(self, place_id: str) -> bool:
+        """Remove any park from the list, for good, until it's restored.
+
+        Records the removal rather than deleting anything: a park from the
+        ranked search would otherwise be back after the next refresh. A
+        manually added park also loses its manual entry, so it isn't both
+        added and removed at once.
+
+        The review, photos and Immich tag are untouched — all keyed by
+        place_id, so restoring the park reunites it with them.
+        """
+        name = self.park_name(place_id)
+        if not name:
+            manual = self.manual.all_parks().get(place_id)
+            name = (manual or {}).get("name", "")
+
+        hidden = await self.hidden.async_hide(place_id, name)
+        removed_manual = await self.manual.async_remove(place_id)
+        if hidden or removed_manual:
             self.async_set_updated_data(self._merge_manual(self._fetched))
-        return removed
+        return hidden or removed_manual
+
+    async def async_restore_park(self, place_id: str) -> bool:
+        """Put a removed park back. Free — nothing is re-fetched."""
+        restored = await self.hidden.async_unhide(place_id)
+        if restored:
+            self.async_set_updated_data(self._merge_manual(self._fetched))
+        return restored
+
+    def is_in_fetched(self, place_id: str) -> bool:
+        """Whether the ranked search itself returns this park.
+
+        Decides if restoring is enough on its own, or whether the park also
+        has to be added by hand to come back.
+        """
+        return any(p.place_id == place_id for p in self._fetched)
+
+    def removed_parks(self) -> list[dict[str, Any]]:
+        """Removed parks, newest first, for the restore list."""
+        items = [
+            {"place_id": place_id, **value}
+            for place_id, value in self.hidden.all_hidden().items()
+        ]
+        items.sort(key=lambda i: i.get("hidden_at") or "", reverse=True)
+        return items
 
     async def async_note_google_rating(
         self, place_id: str, rating: float | None, rating_count: int

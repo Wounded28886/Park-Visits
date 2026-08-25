@@ -49,6 +49,7 @@ from .const import (
     URL_IMMICH_TAGS,
     URL_IMMICH_THUMB,
     URL_PARK_SEARCH,
+    URL_REMOVED_PARKS,
 )
 from .geocoding import (
     GeocodeAuthFailed,
@@ -523,6 +524,28 @@ class ParkSearchView(HomeAssistantView):
         )
 
 
+class RemovedParksView(HomeAssistantView):
+    """Parks removed from the list, so they can be put back.
+
+    Reads straight from the coordinator: nothing here touches Google, and
+    restoring costs nothing either — a removed park is still in the fetched
+    list, just filtered out of the displayed one.
+    """
+
+    url = URL_REMOVED_PARKS
+    name = "api:park_visits:removed"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+
+    async def get(self, request: web.Request) -> web.Response:
+        data = _entry_data(self.hass)
+        if not data:
+            return self.json_message("Park Visits is not configured", 503)
+        return self.json({"parks": data["coordinator"].removed_parks()})
+
+
 class ImmichTagsView(HomeAssistantView):
     """The tags defined on the Immich server, for the tag picker."""
 
@@ -689,5 +712,6 @@ def async_register_views(hass: HomeAssistant) -> None:
     hass.http.register_view(UploadPhotoView(hass))
     hass.http.register_view(GalleryView(hass))
     hass.http.register_view(ParkSearchView(hass))
+    hass.http.register_view(RemovedParksView(hass))
     hass.http.register_view(ImmichTagsView(hass))
     hass.http.register_view(ImmichThumbView(hass))
