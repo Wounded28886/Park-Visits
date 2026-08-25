@@ -27,6 +27,7 @@
  *   show_filter: true
  *   show_add_park: true      # "Add a park" button beside the filter
  *   only_visited: false       # true = only rows with a visit date
+ *   hide_visited: false       # true = drop rows that have one (still-to-visit list)
  *   show_progress: false      # true = "X / Y visited" bar above the table
  *   show_status_strip: true   # false = hide the "Last visited / Next up" strip
  *   columns:                  # optional; omit for the default set below
@@ -247,6 +248,7 @@ class ParkVisitsTableCard extends HTMLElement {
       show_filter: true,
       show_add_park: true,
       only_visited: false,
+      hide_visited: false,
       show_progress: false,
       show_status_strip: true,
       // Turn off to hide the "Add photos" upload field — useful once a park's
@@ -780,6 +782,12 @@ class ParkVisitsTableCard extends HTMLElement {
     if (this.config.only_visited) {
       rows = rows.filter((s) => !!s.attributes.our_visit_date);
     }
+    // The inverse, for a "still to visit" list: once a park has a review it
+    // belongs on the Visited view, so it drops off this one. A park has been
+    // visited exactly when its review carries a visit date.
+    if (this.config.hide_visited) {
+      rows = rows.filter((s) => !s.attributes.our_visit_date);
+    }
     if (this._filter) {
       rows = rows.filter((s) => {
         const hay = `${s.attributes.friendly_name || ""} ${(
@@ -836,8 +844,17 @@ class ParkVisitsTableCard extends HTMLElement {
       let why;
       if (this._filter) {
         why = `No parks match "${escapeHtml(this._filter)}".`;
+      } else if (this.config.only_visited && this.config.hide_visited) {
+        // They're opposites, so together they can never match anything —
+        // say so rather than blaming the data.
+        why =
+          "This card has both only_visited and hide_visited set, which can " +
+          "never match a park. Remove one of them.";
       } else if (matching && this.config.only_visited) {
         why = `None of the ${matching} tracked parks have been visited yet.`;
+      } else if (matching && this.config.hide_visited) {
+        // Worth celebrating rather than reporting as an empty table.
+        why = `Every one of the ${matching} tracked parks has been visited.`;
       } else if (matching) {
         why = `${matching} parks are tracked but none could be listed.`;
       } else {
