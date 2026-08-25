@@ -62,7 +62,8 @@ every visited park.
     card's `columns` config controls which columns show — including a
     `people` entry that expands into one column per configured person (see
     [Person ratings](#person-ratings)) — and `only_visited` / `show_progress`
-    power the Visited view. Set `show_upload: false` to hide the "Add photos"
+    power the Visited view, while `hide_visited` drops parks that already
+    have a review so the Parks view reads as "still to go". Set `show_upload: false` to hide the "Add photos"
     field when a park's pictures come from Immich instead.
   - `park-visits-gallery-card` — a collage of every photo attached to a
     review or matched by a park's Immich tag, filterable by park and by

@@ -33,6 +33,9 @@ views:
             default_sort: rank
             default_direction: asc
             show_filter: true
+            # Once a park has a review it appears on the Visited view, so it
+            # drops off this one — leaving the list of places still to go.
+            hide_visited: true
             grid_options:
               columns: full
               rows: auto
