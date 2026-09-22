@@ -1,0 +1,4 @@
+# The standalone server's only dependencies. The integration itself needs
+# nothing else: it is plain async Python around two HTTP APIs.
+aiohttp>=3.9,<4
+voluptuous>=0.13

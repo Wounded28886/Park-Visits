@@ -1,0 +1,33 @@
+# Park Visits — a self-contained server. No Home Assistant, no database.
+#
+#   docker compose up -d        ->  http://<host>:8098
+#
+# Everything lives in ./data: the park list, your reviews and your photos.
+# Back that folder up and you have backed up the lot.
+services:
+  parks:
+    image: ghcr.io/wounded28886/park-visits:latest
+    # Swap `image:` for `build: .` to build from these files instead.
+    container_name: park-visits
+    restart: unless-stopped
+    ports:
+      - "8098:8098"
+    volumes:
+      - ./data:/data
+    environment:
+      # Required: a Google Places API key (Places API "New" must be enabled).
+      GOOGLE_API_KEY: "${GOOGLE_API_KEY}"
+      # Where to search from — a suburb, city or address. Looked up once and
+      # remembered, so it costs a single Places call ever.
+      LOCATION: "Brisbane, Australia"
+      # Or skip the lookup entirely by giving coordinates:
+      # LATITUDE: "-27.4705"
+      # LONGITUDE: "153.0260"
+      RADIUS_KM: "25"
+      MAX_PARKS: "60"
+      PEOPLE: "Kids,Mum,Dad"
+      TITLE: "Park Visits"
+      # Optional: show each park's photos straight from your Immich library.
+      # IMMICH_URL: "http://192.168.50.230:2283"
+      # IMMICH_API_KEY: "${IMMICH_API_KEY}"
+      # IMMICH_MAX_ASSETS: "200"

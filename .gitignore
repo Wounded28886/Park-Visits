@@ -1,2 +1,7 @@
 __pycache__/
 *.pyc
+
+# Standalone server: local venv, data and seeded demo data
+.venv/
+data/
+demo-data/

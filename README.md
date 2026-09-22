@@ -1,9 +1,14 @@
 # Park Visits
 
-A Home Assistant custom integration that tracks the top-rated parks within a
-configurable radius of a location **you type in** during setup — a suburb,
-city or street address, resolved automatically to a point on the map — using
-the **Google Places API**, ranked by Google rating.
+Tracks the top-rated parks within a configurable radius of a location **you
+type in** — a suburb, city or street address, resolved automatically to a
+point on the map — using the **Google Places API**, ranked by Google rating.
+
+Run it either way; it is the same code in both:
+
+- **In Home Assistant**, as a custom integration with two dashboard cards.
+- **On its own**, as a Docker container with its own address and no Home
+  Assistant anywhere — see **[Standalone (Docker)](#standalone-docker)**.
 
 The dashboard is a sortable table: click a column to sort by it, click a park
 to open its detail panel with Google's photos and reviews, and write your own
@@ -225,6 +230,35 @@ Kids/Mums/Dads ratings migrate automatically into a default people list of
 step. If you'd rather use different names, just change the **people** field
 via **Configure**; existing ratings stay under the old names until you edit
 those reviews.
+
+## Standalone (Docker)
+
+Park Visits also runs **completely on its own** — one container on a NAS or
+any Docker host, storing the park list, your reviews and your photos in a
+single folder. No Home Assistant, no helpers, no dashboard to build: the same
+two cards are served from a page of their own.
+
+```yaml
+services:
+  parks:
+    image: ghcr.io/wounded28886/park-visits:latest
+    restart: unless-stopped
+    ports: ["8098:8098"]
+    volumes: ["./data:/data"]
+    environment:
+      GOOGLE_API_KEY: "your-places-api-key"
+      LOCATION: "Brisbane, Australia"
+```
+
+**[server/README.md](server/README.md) is the whole story for that
+deployment** — a Synology Container Manager walkthrough, every setting, what
+it costs in Places quota, Immich photos and backups. It doesn't mention Home
+Assistant, because the deployment doesn't involve it.
+
+It works by running this repository's integration source unmodified:
+`server/ha_compat.py` supplies stand-ins for the handful of Home Assistant
+pieces it imports, and an aiohttp server exposes the same services and views
+the cards already call. One codebase, one set of tests, two ways to run it.
 
 ## Installation
 

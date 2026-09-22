@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Park Visits</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🌳</text></svg>">
+<style>
+  /*
+   * The cards take every colour from these custom properties, so the look of
+   * the whole page — light and dark — is set here and nowhere else.
+   */
+  :root {
+    color-scheme: light dark;
+    --primary-color: #2e7d32;
+    --accent-color: #ff9800;
+    --success-color: #43a047;
+    --error-color: #db4437;
+    --warning-color: #ffa600;
+    --primary-text-color: #212121;
+    --secondary-text-color: #6b6b6b;
+    --disabled-text-color: #bdbdbd;
+    --text-primary-color: #ffffff;
+    --divider-color: #e2e4e7;
+    --card-background-color: #ffffff;
+    --secondary-background-color: #f1f3f5;
+    --state-icon-color: #6b6b6b;
+    --page-background: #f6f7f9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --primary-color: #66bb6a;
+      --primary-text-color: #e4e4e4;
+      --secondary-text-color: #9b9b9b;
+      --disabled-text-color: #6f6f6f;
+      --divider-color: #464646;
+      --card-background-color: #1c1c1c;
+      --secondary-background-color: #2a2a2a;
+      --page-background: #111213;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page-background);
+    color: var(--primary-text-color);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 14px 16px;
+    background: var(--card-background-color);
+    border-bottom: 1px solid var(--divider-color);
+    position: sticky; top: 0; z-index: 5;
+  }
+  h1 { font-size: 1.15rem; margin: 0; font-weight: 600; }
+  #where, #count { color: var(--secondary-text-color); font-size: .85rem; }
+  nav { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+  nav a, button {
+    font: inherit; font-size: .9rem; cursor: pointer;
+    padding: 7px 14px; border-radius: 999px; text-decoration: none;
+    border: 1px solid var(--divider-color);
+    background: transparent; color: var(--primary-text-color);
+  }
+  nav a.on { background: var(--primary-color); color: var(--text-primary-color); border-color: transparent; }
+  button { border-color: var(--primary-color); color: var(--primary-color); }
+  button[disabled] { opacity: .6; cursor: default; }
+  main { padding: 16px; max-width: 1400px; margin: 0 auto; }
+  /* Each card wraps itself in this element; here it is simply a panel. */
+  ha-card {
+    display: block;
+    background: var(--card-background-color);
+    border-radius: 14px;
+    border: 1px solid var(--divider-color);
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    overflow: hidden;
+  }
+  #status {
+    display: none; margin: 0 16px 12px; padding: 10px 14px;
+    border-radius: 10px; font-size: .9rem;
+    background: var(--secondary-background-color);
+  }
+  #status.warn { background: var(--warning-color); color: #222; }
+  #status.ok { background: var(--success-color); color: #fff; }
+  #boot { color: var(--secondary-text-color); padding: 8px 4px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1 id="title">Park Visits</h1>
+    <span id="where"></span>
+    <span id="count"></span>
+    <nav>
+      <a data-view="parks" href="?view=parks">All parks</a>
+      <a data-view="todo" href="?view=todo">Still to go</a>
+      <a data-view="visited" href="?view=visited">Visited</a>
+      <a data-view="gallery" href="?view=gallery">Photos</a>
+      <button id="refresh">Refresh from Google</button>
+    </nav>
+  </header>
+  <div id="status"></div>
+  <main>
+    <div id="cards"><p id="boot">Loading…</p></div>
+  </main>
+  <script type="module">
+    import '/cards/park-visits-table-card.js';
+    import '/cards/park-visits-gallery-card.js';
+    document.getElementById('boot')?.remove();
+  </script>
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>
