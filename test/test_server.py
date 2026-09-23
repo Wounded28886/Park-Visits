@@ -363,6 +363,24 @@ async def main() -> None:
     app_loc2 = await server_app.create_app()
     ok(calls["text"] == text_before + 1, "a restart reuses the saved location, costing nothing")
 
+    # LOCATION plus coordinates: the label is used, the lookup is skipped.
+    both_dir = tempfile.mkdtemp(prefix="park-visits-both-")
+    os.environ.update({"LATITUDE": "-27.6589", "LONGITUDE": "153.1975",
+                       "LOCATION": "Cornubia, Queensland", "DATA_DIR": both_dir})
+    server_app.DATA_DIR = both_dir
+    server_app.SETTINGS_FILE = Path(both_dir) / "settings.json"
+    text_before2 = calls["text"]
+    app_both = await server_app.create_app()
+    client_both = TestClient(TestServer(app_both))
+    await client_both.start_server()
+    health = await (await client_both.get("/healthz")).json()
+    ok(health["location"] == "Cornubia, Queensland",
+       f"the label is used verbatim when coordinates are given ({health['location']})")
+    ok(calls["text"] == text_before2, "giving coordinates skips the lookup entirely")
+    await client_both.close()
+    shutil.rmtree(both_dir, ignore_errors=True)
+    os.environ.pop("LATITUDE"), os.environ.pop("LONGITUDE")
+
     # A missing key, or a location Google can't find, reports rather than crashing.
     del os.environ["GOOGLE_API_KEY"]
     app_bad = await server_app.create_app()
