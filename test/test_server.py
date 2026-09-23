@@ -339,6 +339,49 @@ async def main() -> None:
     ok(next(s for s in states if s["attributes"].get("place_id") == "park_a")["attributes"]["our_visit_date"] == "2026-09-20",
        "a refresh keeps our review attached")
 
+    # ---------------- configuration ----------------
+    section("configuration")
+    # LOCATION is resolved by name through Text Search, cached, and reused.
+    loc_dir = tempfile.mkdtemp(prefix="park-visits-loc-")
+    os.environ.pop("LATITUDE"), os.environ.pop("LONGITUDE")
+    os.environ["LOCATION"] = "Cornubia"
+    os.environ["DATA_DIR"] = loc_dir
+    server_app.DATA_DIR = loc_dir
+    server_app.SETTINGS_FILE = Path(loc_dir) / "settings.json"
+    text_before = calls["text"]
+    app_loc = await server_app.create_app()
+    client_loc = TestClient(TestServer(app_loc))
+    await client_loc.start_server()
+    health = await (await client_loc.get("/healthz")).json()
+    ok(health["ok"] and "Cornubia" in health["location"],
+       f"a named location is looked up and used ({health.get('location')})")
+    ok(calls["text"] == text_before + 1, "looking it up costs exactly one Text Search")
+    settings = json.loads((Path(loc_dir) / "settings.json").read_text())
+    ok(settings["latitude"] == -27.46, "the resolved coordinates are saved")
+    await client_loc.close()
+
+    app_loc2 = await server_app.create_app()
+    ok(calls["text"] == text_before + 1, "a restart reuses the saved location, costing nothing")
+
+    # A missing key, or a location Google can't find, reports rather than crashing.
+    del os.environ["GOOGLE_API_KEY"]
+    app_bad = await server_app.create_app()
+    client_bad = TestClient(TestServer(app_bad))
+    await client_bad.start_server()
+    res = await client_bad.get("/healthz")
+    body = await res.json()
+    ok(res.status == 503 and not body["ok"] and "GOOGLE_API_KEY" in body["error"],
+       f"a missing API key is reported, not a crash ({body})")
+    res = await client_bad.get("/")
+    ok(res.status == 200 and "can't start yet" in (await res.text()),
+       "and the page says so")
+    await client_bad.close()
+    os.environ["GOOGLE_API_KEY"] = "test-key"
+    os.environ["DATA_DIR"] = data_dir
+    server_app.DATA_DIR = data_dir
+    server_app.SETTINGS_FILE = Path(data_dir) / "settings.json"
+    shutil.rmtree(loc_dir, ignore_errors=True)
+
     # ---------------- the page ----------------
     section("page")
     res = await client2.get("/")

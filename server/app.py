@@ -89,12 +89,18 @@ def _slugify(value: str) -> str:
 
 
 async def _resolve_location(hass, api_key: str, query: str) -> tuple[str, float, float]:
-    """Turn a place name into coordinates, the way the config flow does."""
+    """Turn a place name into coordinates, the way the config flow does.
+
+    Returns PlaceCandidate objects, so read attributes rather than keys.
+    """
     results = await async_search_places(hass, api_key, query)
     if not results:
-        raise RuntimeError(f"Could not find anywhere called {query!r}")
+        raise SystemExit(
+            f"Google couldn't find anywhere called {query!r} — check LOCATION, "
+            "or set LATITUDE and LONGITUDE instead."
+        )
     top = results[0]
-    return top["name"], top["latitude"], top["longitude"]
+    return (top.address or top.name), top.latitude, top.longitude
 
 
 async def build_options(hass) -> dict:
@@ -241,16 +247,58 @@ async def errors_as_json(request, handler):
         return web.json_response({"message": str(err)}, status=500)
 
 
+def error_app(message: str) -> web.Application:
+    """A server that only explains why it couldn't start.
+
+    Exiting instead would crash-loop under `restart: unless-stopped`, and
+    each loop can cost another Places call — so stay up, say what's wrong,
+    and wait to be restarted with the setting fixed.
+    """
+    _LOGGER.error("%s", message)
+    app = web.Application()
+
+    async def page(request):
+        return web.Response(
+            text=(
+                "<!doctype html><meta charset=utf-8>"
+                "<title>Park Visits — not configured</title>"
+                "<body style='font:16px/1.5 system-ui;max-width:42rem;margin:12vh auto;padding:0 1rem'>"
+                "<h1 style='font-size:1.3rem'>Park Visits can't start yet</h1>"
+                f"<p>{message}</p>"
+                "<p style='color:#666'>Fix the setting and restart the container. "
+                "Nothing has been lost.</p>"
+            ),
+            content_type="text/html",
+        )
+
+    async def health(request):
+        return web.json_response({"ok": False, "error": message}, status=503)
+
+    app.router.add_get("/healthz", health)
+    app.router.add_route("*", "/{tail:.*}", page)
+    return app
+
+
 async def create_app() -> web.Application:
     Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
     hass = ha_compat.HomeAssistant(DATA_DIR)
-    options = await build_options(hass)
+    try:
+        options = await build_options(hass)
+    except SystemExit as err:
+        return error_app(str(err))
+    except Exception as err:  # noqa: BLE001 - report, don't crash-loop
+        return error_app(f"Couldn't work out where to look for parks: {err}")
     hass.config.latitude = options["latitude"]
     hass.config.longitude = options["longitude"]
 
     entry = ha_compat.ConfigEntry(entry_id=ENTRY_ID, options=options, title=TITLE)
     _LOGGER.info("Setting up Park Visits for %s", options[CONF_LOCATION_NAME])
-    await async_setup_entry(hass, entry)
+    try:
+        await async_setup_entry(hass, entry)
+    except ha_compat.ConfigEntryAuthFailed as err:
+        return error_app(f"Google rejected the API key: {err}")
+    except Exception as err:  # noqa: BLE001 - report, don't crash-loop
+        return error_app(f"Couldn't fetch parks: {err}")
 
     store = hass.data[DOMAIN][ENTRY_ID]
     coordinator = store["coordinator"]
