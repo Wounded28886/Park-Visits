@@ -407,6 +407,12 @@ async def main() -> None:
     ok(res.status == 200 and "park-visits-table-card" in html, "the page loads both cards")
     ok("home assistant" not in html.lower() and "hacs" not in html.lower(),
        "the page carries no Home Assistant branding")
+    # The cards expect the host to space .card-content and to define the
+    # variables they colour their own inputs with — without these the content
+    # sits flush against the card border and inputs go dark in a light theme.
+    ok(".card-content { padding" in html, "the page pads the cards' content")
+    ok("--primary-background-color" in html and "--ha-card-border-radius" in html,
+       "every custom property the cards use is defined")
     res = await client2.get("/cards/park-visits-table-card.js")
     ok(res.status == 200 and "customElements.define" in (await res.text()),
        "the card bundle is served from the integration's own www/")
