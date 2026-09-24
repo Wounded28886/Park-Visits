@@ -75,6 +75,18 @@ ENTRY_ID = "standalone"
 SETTINGS_FILE = Path(DATA_DIR) / "settings.json"
 
 
+def _version() -> str:
+    """Read the integration's own version, so there is one to keep in step."""
+    try:
+        manifest = ROOT / "custom_components" / "park_visits" / "manifest.json"
+        return "v" + json.loads(manifest.read_text(encoding="utf-8"))["version"]
+    except Exception:  # noqa: BLE001 - a missing version must not stop the server
+        return "(unknown version)"
+
+
+VERSION = _version()
+
+
 def _env_float(name: str) -> float | None:
     raw = os.environ.get(name, "").strip()
     try:
@@ -384,7 +396,10 @@ def main() -> None:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     app = loop.run_until_complete(create_app())
-    _LOGGER.info("Park Visits listening on http://0.0.0.0:%d — data in %s", PORT, DATA_DIR)
+    # The version and the user are the first two questions when something is
+    # wrong in someone else's logs, so lead with them.
+    _LOGGER.info("Park Visits %s — running as uid %d", VERSION, os.getuid() if hasattr(os, "getuid") else -1)
+    _LOGGER.info("listening on http://0.0.0.0:%d — data in %s", PORT, DATA_DIR)
     web.run_app(app, host="0.0.0.0", port=PORT, loop=loop, print=None)
 
 
